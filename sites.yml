@@ -1,0 +1,30 @@
+# Edit this file to adjust the website sources. A push on Github rebuilds the gallery immediately.
+title: Phototek
+sites:
+  - id: american-suburb-x
+    name: American Suburb X
+    url: https://americansuburbx.com/
+    feed: https://americansuburbx.com/feed/
+    mode: feed
+    images: 3
+  - id: flakphoto
+    name: FlakPhoto Digest
+    url: https://www.flakphoto.news/
+    feed: https://www.flakphoto.news/feed
+    mode: feed
+    images: 2
+  - id: fototapeta
+    name: FOTOTAPETA
+    url: https://fototapeta.art.pl/
+    mode: fototapeta
+    images: 3
+  - id: f-stop
+    name: F-Stop Magazine
+    url: https://fstopmagazine.com/
+    mode: fstop
+    images: 1
+  - id: lensculture
+    name: LensCulture
+    url: https://www.lensculture.com/
+    mode: lensculture
+    images: 3

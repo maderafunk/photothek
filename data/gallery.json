@@ -1,0 +1,127 @@
+{
+  "sites": {
+    "american-suburb-x": {
+      "url": "https://americansuburbx.com/",
+      "checked_at": "2026-09-15T22:19:17+00:00",
+      "updated_at": "2026-09-15T22:19:17+00:00",
+      "images": [
+        {
+          "src": "https://americansuburbx.com/wp-content/uploads/2026/09/psycho--1247x800.jpg",
+          "alt": "Beni Bischoff Psychobuch 2",
+          "article": "https://americansuburbx.com/2026/09/beni-bischoff-psychobuch-2.html",
+          "title": "Beni Bischoff Psychobuch 2",
+          "width": 1247,
+          "height": 800,
+          "published": "Mon, 07 Sep 2026 10:08:36 +0000"
+        },
+        {
+          "src": "https://americansuburbx.com/wp-content/uploads/2026/08/778755899_1645884080881880_4959783463675679760_n-1639x800.jpeg",
+          "alt": "Raymond Meeks A Common-Place Book",
+          "article": "https://americansuburbx.com/2026/08/raymond-meeks-a-common-place-book.html",
+          "title": "Raymond Meeks A Common-Place Book",
+          "width": 1639,
+          "height": 800,
+          "published": "Wed, 26 Aug 2026 10:18:40 +0000"
+        },
+        {
+          "src": "https://americansuburbx.com/wp-content/uploads/2026/08/5f200e00c3db60fc1d1c0459f5f411d5-750x800.jpg",
+          "alt": "Steven Shearer Working From Life",
+          "article": "https://americansuburbx.com/2026/08/steven-shearer-working-from-life.html",
+          "title": "Steven Shearer Working From Life",
+          "width": 750,
+          "height": 800,
+          "published": "Wed, 19 Aug 2026 16:37:42 +0000"
+        }
+      ],
+      "error": null
+    },
+    "flakphoto": {
+      "url": "https://www.flakphoto.news/",
+      "checked_at": "2026-09-15T22:18:41+00:00",
+      "updated_at": "2026-09-15T22:18:41+00:00",
+      "images": [
+        {
+          "src": "https://substackcdn.com/image/fetch/$s_!_q17!,w_848,c_limit,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fd44d15ac-f8b3-4de7-8b4b-a73b88f65957_2936x2200.jpeg",
+          "alt": "Show & Tell: Chris Buck",
+          "article": "https://www.flakphoto.news/p/show-and-tell-chris-buck",
+          "title": "Show & Tell: Chris Buck",
+          "published": "Wed, 09 Sep 2026 16:44:10 GMT"
+        },
+        {
+          "src": "https://substackcdn.com/image/fetch/$s_!JA8m!,w_848,c_limit,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2Fff0d741a-0258-4b78-a339-b4386cafc39d_3038x2000.jpeg",
+          "alt": "How Analog Photography Brought Me Back to My Creative Practice",
+          "article": "https://www.flakphoto.news/p/jillian-guyette-how-analog-photography-brought-me",
+          "title": "How Analog Photography Brought Me Back to My Creative Practice",
+          "published": "Wed, 26 Aug 2026 18:45:02 GMT"
+        }
+      ],
+      "error": null
+    },
+    "fototapeta": {
+      "url": "https://fototapeta.art.pl/",
+      "checked_at": "2026-09-15T22:18:43+00:00",
+      "updated_at": "2026-09-15T22:18:43+00:00",
+      "images": [
+        {
+          "src": "https://fototapeta.art.pl/2026/i/ami/Minorski-suterena.jpg",
+          "alt": "FOTOTAPETA",
+          "article": "https://fototapeta.art.pl/2026/ami.php",
+          "title": "FOTOTAPETA"
+        },
+        {
+          "src": "https://fototapeta.art.pl/2026/i/mgd/Marek%20Gardulski%20Autoportret%20-%20Galeria%20Starmach%20-P%207.jpg",
+          "alt": "FOTOTAPETA",
+          "article": "https://fototapeta.art.pl/2026/mgd.php",
+          "title": "FOTOTAPETA"
+        },
+        {
+          "src": "https://fototapeta.art.pl/2026/i/tsc/oliviero-toscani-benetton-03-tongs.jpg",
+          "alt": "FOTOTAPETA",
+          "article": "https://fototapeta.art.pl/2026/tsc.php",
+          "title": "FOTOTAPETA"
+        }
+      ],
+      "error": null
+    },
+    "f-stop": {
+      "url": "https://fstopmagazine.com/",
+      "checked_at": "2026-09-15T22:18:50+00:00",
+      "updated_at": "2026-09-15T22:18:50+00:00",
+      "images": [
+        {
+          "src": "https://fstopmagazine.com/cover138.jpg",
+          "alt": "cover photograph for f-stop magazine",
+          "article": "https://fstopmagazine.com/home.html",
+          "title": "cover photograph for f-stop magazine"
+        }
+      ],
+      "error": null
+    },
+    "lensculture": {
+      "url": "https://www.lensculture.com/",
+      "checked_at": "2026-09-15T22:18:50+00:00",
+      "updated_at": "2026-09-15T22:18:50+00:00",
+      "images": [
+        {
+          "src": "https://images.lensculture.com/image/45622b54-3849-4096-8958-e31bc6989800/cover740x480",
+          "alt": "A Kind of Paradise – Colonial-Era Photography",
+          "article": "https://www.lensculture.com/articles/museum-rietberg-a-kind-of-paradise-colonial-era-photography",
+          "title": "A Kind of Paradise – Colonial-Era Photography"
+        },
+        {
+          "src": "https://images.lensculture.com/image/35701206-af13-4de6-6a44-6c327feb7700/cover740x480",
+          "alt": "Descendants of Summer",
+          "article": "https://www.lensculture.com/articles/nicola-muirhead-descendants-of-summer",
+          "title": "Descendants of Summer"
+        },
+        {
+          "src": "https://images.lensculture.com/image/41538fe4-1cd8-4d2c-10db-65689e4d5000/cover740x480",
+          "alt": "State of Denial",
+          "article": "https://www.lensculture.com/articles/sasha-velichko-state-of-denial-2",
+          "title": "State of Denial"
+        }
+      ],
+      "error": null
+    }
+  }
+}
