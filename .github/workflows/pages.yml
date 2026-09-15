@@ -1,0 +1,64 @@
+name: Refresh photographs and publish
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    # Daily, away from the busy start of the hour (UTC).
+    - cron: '23 6 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: photography-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install the configuration reader
+        run: python -m pip install -r requirements.txt
+      - name: Restore source responses and last successful photographs
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .cache
+            data/gallery.json
+          key: photography-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: photography-v1-
+      - name: Check extraction and safe HTML output
+        run: python -m unittest discover -s tests -v
+      - name: Refresh photographs and build static HTML
+        run: python build.py
+      - name: Preserve the next build's fallback
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .cache
+            data/gallery.json
+          key: photography-v1-${{ github.run_id }}-${{ github.run_attempt }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish static gallery
+        id: deployment
+        uses: actions/deploy-pages@v4
