@@ -31,10 +31,11 @@ sites:
   - id: smbh
     name: Super Massive Black Hole
     url: https://smbhmag.com/
-    mode: feed
+    mode: fstop
     images: 1
   - id: burn
     name: Burn Magazine
     url: https://www.burnmagazine.org/
+    feed: https://www.burnmagazine.org/feed
     mode: feed
     images: 3
