@@ -28,3 +28,13 @@ sites:
     url: https://www.lensculture.com/
     mode: lensculture
     images: 3
+  - id: smbh
+    name: Super Massive Black Hole
+    url: https://smbhmag.com/
+    mode: feed
+    images: 1
+  - id: burn
+    name: Burn Magazine
+    url: https://www.burnmagazine.org/
+    mode: feed
+    images: 3
