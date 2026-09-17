@@ -478,7 +478,7 @@ def render(cfg, records, output, updated_on=None):
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https: http:; style-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="description" content="A photographic wall linking to independent photography publications and their recent work.">
-<title>{title}</title><link rel="stylesheet" href="style.css?v=safari-column-align-1"></head>
+<title>{title}</title><link rel="stylesheet" href="style.css?v=equal-image-gaps-1"></head>
 <body><a class="skip" href="#gallery">Skip to photographs</a>
 <header><h1>{title}</h1><p class="edition">{len(cfg['sites']):02d} publications</p></header>
 <main id="gallery" aria-label="Photography publications">{''.join(tiles)}</main>
