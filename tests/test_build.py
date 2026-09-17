@@ -83,8 +83,9 @@ class GalleryTests(unittest.TestCase):
         self.assertEqual(toggle.attrs['type'], 'checkbox')
         self.assertEqual(toggle.attrs['id'], 'tile-example')
         self.assertEqual(next(doc.walk('label')).attrs['for'], 'tile-example')
-        links = [node.attrs['href'] for node in doc.walk('a')]
-        self.assertIn('https://example.com/', links)
+        link = next(node for node in doc.walk('a') if node.attrs.get('href') == 'https://example.com/')
+        self.assertEqual(link.attrs['target'], '_blank')
+        self.assertEqual(link.attrs['rel'], 'noopener noreferrer')
         arrow = next(doc.walk('svg'))
         self.assertEqual(arrow.attrs['class'], 'external-arrow')
         mirrored = [node for node in doc.walk() if 'back-pictures' in node.attrs.get('class', '').split()]
