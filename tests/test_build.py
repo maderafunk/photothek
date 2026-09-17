@@ -25,6 +25,13 @@ class GalleryTests(unittest.TestCase):
         self.assertEqual(site['url'], 'https://example.com/')
         self.assertEqual(site['images'], 3)
 
+    def test_one_image_count_applies_to_every_site(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'sites.yml'
+            path.write_text('images_per_site: 5\nsites:\n  - name: One\n    link: https://one.example/\n  - name: Two\n    link: https://two.example/\n')
+            sites = build.config(path)['sites']
+        self.assertEqual([site['images'] for site in sites], [5, 5])
+
     def test_legacy_site_fields_are_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'sites.yml'
@@ -95,7 +102,8 @@ class GalleryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             build.render({'sites': [older, newer]}, records, Path(tmp), updated_on='2026-09-17')
             doc = build.Document((Path(tmp) / 'index.html').read_text()).root
-        self.assertEqual([node.attrs['id'] for node in doc.walk('input')], ['tile-newer', 'tile-older'])
+        toggles = [node for node in doc.walk('input') if node.attrs.get('class') == 'detail-toggle']
+        self.assertEqual([node.attrs['id'] for node in toggles], ['tile-newer-1', 'tile-older-1'])
 
     def test_render_orders_footer_links_alphabetically(self):
         zulu = {'id': 'zulu', 'url': 'https://zulu.example/', 'name': 'Zulu', 'images': 3}
@@ -106,25 +114,32 @@ class GalleryTests(unittest.TestCase):
         nav = next(doc.walk('nav'))
         self.assertEqual([node.text() for node in nav.walk('a')], ['alpha', 'Zulu'])
 
-    def test_tile_uses_css_only_card_toggle(self):
+    def test_image_tiles_share_magazine_selection(self):
         site = {'id': 'example', 'url': 'https://example.com/', 'name': 'Example', 'images': 3}
-        records = {'example': {'images': [{'src': 'https://example.com/photo.jpg'}]}}
+        records = {'example': {'images': [
+            {'src': 'https://example.com/one.jpg'},
+            {'src': 'https://example.com/two.jpg'},
+        ]}}
         with tempfile.TemporaryDirectory() as tmp:
             build.render({'sites': [site]}, records, Path(tmp), updated_on='2026-09-17')
             html = (Path(tmp) / 'index.html').read_text()
             doc = build.Document(html).root
-        toggle = next(doc.walk('input'))
-        self.assertEqual(toggle.attrs['type'], 'checkbox')
-        self.assertEqual(toggle.attrs['id'], 'tile-example')
-        self.assertEqual(next(doc.walk('label')).attrs['for'], 'tile-example')
+        toggles = [node for node in doc.walk('input') if node.attrs.get('class') == 'detail-toggle']
+        self.assertEqual(len(toggles), 2)
+        self.assertEqual([node.attrs['type'] for node in toggles], ['radio', 'radio'])
+        self.assertEqual([node.attrs['id'] for node in toggles], ['tile-example-1', 'tile-example-2'])
+        self.assertTrue(all(node.attrs['name'] == 'selected-card' for node in toggles))
+        self.assertEqual(len(list(doc.walk('article'))), 2)
+        close_labels = [node for node in doc.walk('label') if node.attrs.get('class') == 'card-close']
+        self.assertTrue(all(node.attrs['for'] == 'cards-closed' for node in close_labels))
         link = next(node for node in doc.walk('a') if node.attrs.get('href') == 'https://example.com/')
         self.assertEqual(link.attrs['target'], '_blank')
         self.assertEqual(link.attrs['rel'], 'noopener noreferrer')
         arrow = next(doc.walk('svg'))
         self.assertEqual(arrow.attrs['class'], 'external-arrow')
-        mirrored = [node for node in doc.walk() if 'back-pictures' in node.attrs.get('class', '').split()]
-        self.assertEqual(len(mirrored), 1)
-        self.assertEqual(len(list(mirrored[0].walk('img'))), 1)
+        backs = [node for node in doc.walk() if 'back-picture' in node.attrs.get('class', '').split()]
+        self.assertEqual(len(backs), 2)
+        self.assertTrue(all(len(list(node.walk('img'))) == 1 for node in backs))
         self.assertNotIn('↗', html)
 
 if __name__ == '__main__':
