@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <mask id="tiles">
+    <rect width="64" height="64" fill="#fff"/>
+    <path fill="#000" d="M5 5h25v31H5zm30 0h24v19H35zm0 24h24v30H35zM5 41h25v18H5z"/>
+  </mask>
+  <rect width="64" height="64" fill="#fff" mask="url(#tiles)"/>
+</svg>
