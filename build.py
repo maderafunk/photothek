@@ -356,7 +356,7 @@ def render(cfg, records, output, updated_on=None):
         klass = ' two' if len(photos) == 2 else ''
         control = f'tile-{site["id"]}'
         tiles.append(f'''<article class="tile">
-<input class="flip-toggle" type="checkbox" id="{control}" aria-label="Show details for {name}">
+<input class="card-toggle" type="checkbox" id="{control}" aria-label="Show details for {name}">
 <div class="card">
 <label class="card-front" for="{control}"><span class="pictures{klass}">{"".join(imgs)}</span></label>
 <div class="card-back"><label class="card-close" for="{control}" aria-label="Return to photographs"></label><a href="{href}">{name}<span aria-hidden="true"> ↗</span></a></div>
@@ -368,7 +368,7 @@ def render(cfg, records, output, updated_on=None):
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https: http:; style-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="description" content="A photographic wall linking to independent photography publications and their recent work.">
-<title>{title}</title><link rel="stylesheet" href="style.css?v=centered-cards-1"></head>
+<title>{title}</title><link rel="stylesheet" href="style.css?v=crossfade-columns-1"></head>
 <body><a class="skip" href="#gallery">Skip to photographs</a>
 <header><h1>{title}</h1><p class="edition">{len(cfg['sites']):02d} publications</p></header>
 <main id="gallery" aria-label="Photography publications">{''.join(tiles)}</main>
