@@ -10,6 +10,7 @@ from html.parser import HTMLParser
 import json
 from pathlib import Path
 import re
+import shutil
 from urllib.error import HTTPError
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
@@ -483,17 +484,17 @@ def render(cfg, records, output, updated_on=None):
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' https: http:; style-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="description" content="A photographic wall linking to independent photography publications and their recent work.">
-<title>{title}</title><link rel="icon" href="favicon.svg?v=4" type="image/svg+xml"><link rel="stylesheet" href="style.css?v=favicon-1"></head>
+<title>{title}</title><link rel="icon" href="favicon.svg?v=6" type="image/svg+xml"><link rel="icon" href="favicon.png?v=6" type="image/png" sizes="64x64"><link rel="shortcut icon" href="favicon.ico?v=6"><link rel="apple-touch-icon" href="apple-touch-icon.png?v=6"><link rel="stylesheet" href="style.css?v=theme-2"></head>
 <body><a class="skip" href="#gallery">Skip to photographs</a>
-<header><h1>{title}</h1><p class="edition">{len(cfg['sites']):02d} publications</p></header>
+<header><h1><svg class="site-logo" aria-hidden="true" viewBox="0 0 64 64"><path fill-rule="evenodd" d="M0 0h64v64H0zM5 5v31h25V5zm30 0v19h24V5zm0 24v30h24V29zM5 41v18h25V41z"/></svg><span>{title}</span></h1><div class="header-meta"><input class="theme-toggle" type="checkbox" id="theme-toggle" aria-label="Switch color theme"><label class="theme-switch" for="theme-toggle" title="Switch color theme"><span class="theme-track"><svg class="theme-knob" aria-hidden="true" viewBox="0 0 64 64"><path fill-rule="evenodd" d="M0 0h64v64H0zM5 5v31h25V5zm30 0v19h24V5zm0 24v30h24V29zM5 41v18h25V41z"/></svg></span></label><p class="edition">{len(cfg['sites']):02d} publications</p></div></header>
 <main id="gallery" aria-label="Photography publications"><input class="close-toggle" type="radio" name="selected-card" id="cards-closed" checked>{''.join(groups)}</main>
 <footer><p>Photographs belong to their respective creators.</p><nav aria-label="Publications">{links}</nav><p class="updated">{title} is updated every Friday. Last update: <time datetime="{updated_on}">{updated_on}</time></p></footer>
 </body></html>\n'''
     (output / 'index.html').write_text(content)
     assets = ROOT / 'dist'
     if output.resolve() != assets.resolve():
-        for filename in ('style.css', 'favicon.svg'):
-            (output / filename).write_text((assets / filename).read_text())
+        for filename in ('style.css', 'favicon.svg', 'favicon.png', 'favicon.ico', 'apple-touch-icon.png'):
+            shutil.copyfile(assets / filename, output / filename)
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
