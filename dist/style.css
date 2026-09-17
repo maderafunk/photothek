@@ -8,20 +8,20 @@ a{color:inherit;text-underline-offset:4px}
 header{max-width:1800px;margin:auto;padding:32px 0 25px;display:flex;justify-content:space-between;gap:16px;align-items:baseline;border-bottom:1px solid #dedede}
 h1{font-size:clamp(1.5rem,3vw,2.25rem);font-weight:500;letter-spacing:-.055em;line-height:1.1;margin:0}
 .edition{font-size:.875rem;color:var(--muted);margin:0;white-space:nowrap}
-main{max-width:1800px;margin:22px auto 0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--gap);align-items:start}
-.tile{min-width:0;display:block;position:relative;overflow:hidden;perspective:1200px;-webkit-perspective:1200px}
+main{max-width:1800px;margin:22px auto 0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--gap);align-items:stretch}
+.tile{min-width:0;height:100%;display:block;position:relative;overflow:hidden;perspective:1200px;-webkit-perspective:1200px}
 .flip-toggle{position:absolute;width:1px;height:1px;margin:-1px;clip-path:inset(50%);overflow:hidden;white-space:nowrap}
-.card{position:relative}
+.card{position:relative;height:100%}
 .flip-toggle:focus-visible+.card{outline:3px solid #144dff;outline-offset:3px}
 .card-front,.card-back{display:block;backface-visibility:hidden;-webkit-backface-visibility:hidden;overflow:hidden;transition:transform .55s cubic-bezier(.2,.7,.2,1)}
-.card-front{position:relative;z-index:1;cursor:pointer;background:#ededed;transform:rotateY(0);-webkit-transform:rotateY(0)}
+.card-front{position:relative;z-index:1;height:100%;display:flex;align-items:center;justify-content:center;cursor:pointer;background:white;border:1px solid #cfcfcf;transform:rotateY(0);-webkit-transform:rotateY(0)}
 .card-back{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;padding:32px;text-align:center;background:var(--ink);color:white;transform:rotateY(180deg);-webkit-transform:rotateY(180deg)}
 .flip-toggle:checked+.card .card-front{transform:rotateY(-180deg);-webkit-transform:rotateY(-180deg)}
 .flip-toggle:checked+.card .card-back{transform:rotateY(0);-webkit-transform:rotateY(0)}
 .card-back a{position:relative;z-index:2;color:white;font-size:clamp(1.1rem,2vw,1.6rem);font-weight:500;text-decoration-thickness:1px}
 .flip-toggle:not(:checked)+.card .card-back a{visibility:hidden}
 .card-close{position:absolute;inset:0;z-index:1;cursor:pointer}
-.pictures{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px;align-items:start;background:white}
+.pictures{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px;align-items:center;background:white}
 .pictures img{width:100%;height:auto;display:block;background:#ededed;color:#333;font-size:.875rem;min-height:60px}
 .pictures img:first-child{grid-column:1/-1}
 .pictures.two img{grid-column:1/-1}
