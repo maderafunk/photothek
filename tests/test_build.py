@@ -10,6 +10,12 @@ class FakeClient:
         return self.pages[address]
 
 class GalleryTests(unittest.TestCase):
+    def test_common_image_dimensions_are_read_from_headers(self):
+        png = b'\x89PNG\r\n\x1a\n' + b'\0' * 8 + (640).to_bytes(4, 'big') + (480).to_bytes(4, 'big')
+        gif = b'GIF89a' + (320).to_bytes(2, 'little') + (240).to_bytes(2, 'little')
+        self.assertEqual(build.image_dimensions(png), (640, 480))
+        self.assertEqual(build.image_dimensions(gif), (320, 240))
+
     def test_minimal_config_generates_id_and_defaults(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'sites.yml'
