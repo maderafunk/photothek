@@ -1,6 +1,6 @@
 # Edit this file to adjust the website sources. A push on Github rebuilds the gallery immediately.
 title: Photothek
-images_per_site: 3
+images_per_site: 5
 # Adding a publication requires these two fields.
 sites:
   - name: American Suburb X
