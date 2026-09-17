@@ -339,14 +339,12 @@ def config(path):
 
 def render(cfg, records, output, updated_on=None):
     updated_on = updated_on or datetime.now(timezone.utc).date().isoformat()
-    
     tiles = []
     for idx, site in enumerate(cfg['sites']):
         record = records.get(site['id'], {})
         photos = record.get('images', [])[:site['images']]
         name, href = escape(site['name']), escape(url(site['url']), quote=True)
         if not photos:
-            tiles.append(f'<article class="tile empty"><h2><a href="{href}">{name} ↗</a></h2><p>No photograph available yet.</p></article>')
             continue
         imgs = []
         for j, photo in enumerate(photos):
@@ -356,7 +354,13 @@ def render(cfg, records, output, updated_on=None):
             loading = 'eager' if idx < 3 and j == 0 else 'lazy'
             imgs.append(f'<img src="{escape(url(photo["src"]), quote=True)}" alt="{escape(photo.get("alt") or site["name"], quote=True)}" loading="{loading}" decoding="async"{dims}>')
         klass = ' two' if len(photos) == 2 else ''
-        tiles.append(f'<article class="tile"><a class="tile-link" href="{href}" aria-label="Visit {name}"><div class="pictures{klass}">{"".join(imgs)}</div><span class="caption"><span class="name">{name}</span><span class="visit" aria-hidden="true">↗</span></span></a></article>')
+        control = f'tile-{site["id"]}'
+        tiles.append(f'''<article class="tile">
+<input class="flip-toggle" type="checkbox" id="{control}" aria-label="Show details for {name}">
+<div class="card">
+<label class="card-front" for="{control}"><span class="pictures{klass}">{"".join(imgs)}</span></label>
+<div class="card-back"><label class="card-close" for="{control}" aria-label="Return to photographs"></label><a href="{href}">{name}<span aria-hidden="true"> ↗</span></a></div>
+</div></article>''')
     links = ' '.join(f'<a href="{escape(s["url"], quote=True)}">{escape(s["name"])}</a>' for s in cfg['sites'])
     title = escape(str(cfg.get('title', 'Photography Wall')))
     output.mkdir(parents=True, exist_ok=True)
