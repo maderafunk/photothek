@@ -5,7 +5,7 @@ body{margin:0;padding:0 clamp(16px,3vw,48px)}
 a{color:inherit;text-underline-offset:4px}
 .skip{position:absolute;top:-80px;left:20px;background:var(--paper);padding:12px;z-index:10}
 .skip:focus{top:10px}
-header{max-width:1800px;margin:auto;padding:32px 0 25px;display:flex;justify-content:space-between;gap:16px;align-items:baseline;border-bottom:1px solid var(--line)}
+header{max-width:1800px;margin:auto;padding:32px 0 25px;display:flex;justify-content:space-between;gap:16px;align-items:flex-end;border-bottom:1px solid var(--line)}
 h1{font-size:clamp(1.5rem,3vw,2.25rem);font-weight:500;letter-spacing:-.055em;line-height:1.1;margin:0;display:flex;align-items:center;gap:.32em}
 .site-logo{width:1em;height:1em;flex:none;fill:currentColor}
 .header-meta{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
@@ -41,7 +41,7 @@ footer nav{display:flex;gap:10px 18px;flex-wrap:wrap}
 footer .updated{flex-basis:100%}
 @media(min-width:1600px){main{columns:4}}
 @media(max-width:850px){main{columns:2}header{padding-top:25px}}
-@media(max-width:520px){main{columns:1}.edition{white-space:normal}header{align-items:flex-start}.card-front img{min-height:0}}
+@media(max-width:520px){main{columns:1}.edition{white-space:normal}.card-front img{min-height:0}}
 html:has(#theme-toggle:checked){--ink:#f2f2f2;--muted:#b7b7b7;--paper:#303030;--line:#565656;--placeholder:#424242}
 @media(prefers-color-scheme:dark){:root{--ink:#f2f2f2;--muted:#b7b7b7;--paper:#303030;--line:#565656;--placeholder:#424242}html:has(#theme-toggle:checked){--ink:#171717;--muted:#666;--paper:#fff;--line:#dedede;--placeholder:#ededed}}
 @media(prefers-reduced-motion:reduce){.card-front,.card-back,.theme-knob{transition:none}}
