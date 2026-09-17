@@ -93,6 +93,15 @@ class GalleryTests(unittest.TestCase):
         self.assertIn('Photography Wall is updated every Friday. Last update:', html)
         self.assertNotIn('2026-09-17T', html)
 
+    def test_render_includes_favicon(self):
+        site = {'id': 'example', 'url': 'https://example.com/', 'name': 'Example', 'images': 3}
+        with tempfile.TemporaryDirectory() as tmp:
+            build.render({'sites': [site]}, {}, Path(tmp), updated_on='2026-09-17')
+            html = (Path(tmp) / 'index.html').read_text()
+            favicon = Path(tmp) / 'favicon.svg'
+            self.assertTrue(favicon.exists())
+        self.assertIn('<link rel="icon" href="favicon.svg?v=4" type="image/svg+xml">', html)
+
     def test_render_orders_newest_updated_tile_first(self):
         older = {'id': 'older', 'url': 'https://older.example/', 'name': 'Older', 'images': 3}
         newer = {'id': 'newer', 'url': 'https://newer.example/', 'name': 'Newer', 'images': 3}
