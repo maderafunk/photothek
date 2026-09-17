@@ -340,7 +340,8 @@ def config(path):
 def render(cfg, records, output, updated_on=None):
     updated_on = updated_on or datetime.now(timezone.utc).date().isoformat()
     tiles = []
-    for idx, site in enumerate(cfg['sites']):
+    sites = sorted(cfg['sites'], key=lambda site: records.get(site['id'], {}).get('updated_at') or '', reverse=True)
+    for idx, site in enumerate(sites):
         record = records.get(site['id'], {})
         photos = record.get('images', [])[:site['images']]
         name, href = escape(site['name']), escape(url(site['url']), quote=True)
@@ -361,7 +362,8 @@ def render(cfg, records, output, updated_on=None):
 <label class="card-front" for="{control}"><span class="pictures{klass}">{"".join(imgs)}</span></label>
 <div class="card-back"><span class="pictures{klass} back-pictures" aria-hidden="true">{"".join(imgs)}</span><label class="card-close" for="{control}" aria-label="Return to photographs"></label><a href="{href}" target="_blank" rel="noopener noreferrer">{name}<svg class="external-arrow" aria-hidden="true" viewBox="0 0 16 16"><path d="M3 13 13 3M6 3h7v7"/></svg></a></div>
 </div></article>''')
-    links = ' '.join(f'<a href="{escape(s["url"], quote=True)}" target="_blank" rel="noopener noreferrer">{escape(s["name"])}</a>' for s in cfg['sites'])
+    footer_sites = sorted(cfg['sites'], key=lambda site: site['name'].casefold())
+    links = ' '.join(f'<a href="{escape(s["url"], quote=True)}" target="_blank" rel="noopener noreferrer">{escape(s["name"])}</a>' for s in footer_sites)
     title = escape(str(cfg.get('title', 'Photography Wall')))
     output.mkdir(parents=True, exist_ok=True)
     content = f'''<!doctype html>
