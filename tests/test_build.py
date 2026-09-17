@@ -87,6 +87,9 @@ class GalleryTests(unittest.TestCase):
         self.assertIn('https://example.com/', links)
         arrow = next(doc.walk('svg'))
         self.assertEqual(arrow.attrs['class'], 'external-arrow')
+        mirrored = [node for node in doc.walk() if 'back-pictures' in node.attrs.get('class', '').split()]
+        self.assertEqual(len(mirrored), 1)
+        self.assertEqual(len(list(mirrored[0].walk('img'))), 1)
         self.assertNotIn('↗', html)
 
 if __name__ == '__main__':
