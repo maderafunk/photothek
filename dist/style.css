@@ -30,7 +30,7 @@ main{max-width:1800px;margin:22px auto 0;columns:3;column-gap:var(--gap);font-si
 footer{max-width:1800px;margin:22px auto 0;border-top:1px solid #dedede;padding:20px 0 28px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:.875rem;line-height:1.5}
 footer p{margin:0}
 footer nav{display:flex;gap:10px 18px;flex-wrap:wrap}
-footer .updated{flex-basis:100%}
+footer .updated{flex-basis:100%;border-top:1px solid #dedede;padding-top:20px}
 @media(min-width:1600px){main{columns:4}}
 @media(max-width:850px){main{columns:2}header{padding-top:25px}}
 @media(max-width:520px){main{columns:1}.edition{white-space:normal}header{align-items:flex-start}.card-front img{min-height:0}}
