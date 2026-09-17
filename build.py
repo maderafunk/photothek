@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 import re
 from urllib.error import HTTPError
-from urllib.parse import quote, urljoin, urlsplit, urlunsplit
+from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 import xml.etree.ElementTree as ET
 import yaml
@@ -113,8 +113,30 @@ class Client:
         # Bound cache size to URLs used in this build; article bodies contain no image bytes.
         write_json(self.path, {k: self.cache[k] for k in self.used if k in self.cache})
 
+def decorative_context(node):
+    """Identify images placed in site chrome rather than editorial content."""
+    chrome = re.compile(r'(^|[-_\s])(header|masthead|branding|brand|logo|site-title|navbar|navigation)([-_\s]|$)', re.I)
+    current = node
+    while current:
+        if current.tag in ('header', 'nav') or current.attrs.get('role', '').lower() in ('banner', 'navigation'):
+            return True
+        markers = ' '.join(str(current.attrs.get(k, '')) for k in ('id', 'class'))
+        if chrome.search(markers):
+            return True
+        current = current.parent
+    return False
+
+def image_url(address):
+    return bool(re.search(r'\.(?:avif|gif|jpe?g|png|webp)(?:$|[?#])', address, re.I))
+
+def homepage_alias(address):
+    path = urlsplit(address).path.rstrip('/').lower()
+    return path.rsplit('/', 1)[-1] in ('home', 'home.html', 'home.htm', 'index.html', 'index.htm')
+
 def image(node, base, title='', article=''):
     attrs = node.attrs
+    if decorative_context(node):
+        return None
     source = attrs.get('data-src') or attrs.get('data-original') or attrs.get('src')
     candidates = []
     # Split at descriptor separators, not commas embedded in CDN image URLs.
@@ -128,23 +150,47 @@ def image(node, base, title='', article=''):
         source = url(source, base) if source else ''
     except ValueError:
         return None
-    if not source or re.search(r'(logo|avatar|tracking|pixel|icon|badge|button)', source, re.I):
+    markers = ' '.join(str(attrs.get(k, '')) for k in ('alt', 'class', 'id'))
+    if not source or re.search(r'(logo|avatar|tracking|pixel|icon|badge|button|masthead|site[-_]?header|branding)', source + ' ' + markers, re.I):
         return None
     if urlsplit(source).path.lower().endswith('.svg'):
         return None
     for key in ('width', 'height'):
         if str(attrs.get(key, '')).isdigit() and int(attrs[key]) < 100:
             return None
+    if all(str(attrs.get(k, '')).isdigit() and int(attrs[k]) > 0 for k in ('width', 'height')):
+        width, height = int(attrs['width']), int(attrs['height'])
+        if width / height > 4.5:
+            return None
     out = {'src': source, 'alt': attrs.get('alt') or title or 'Photograph', 'article': article or base, 'title': title}
     if all(str(attrs.get(k, '')).isdigit() and int(attrs[k]) > 0 for k in ('width', 'height')):
         out.update(width=int(attrs['width']), height=int(attrs['height']))
     return out
 
+def image_identity(address):
+    """Collapse common CDN and CMS resized variants of the same asset."""
+    parsed = urlsplit(address)
+    path = unquote(parsed.path).lower()
+    path = re.sub(r'[-_]\d{2,5}x\d{2,5}(?=\.[a-z0-9]+$)', '', path)
+    path = re.sub(r'@(?:2|3)x(?=\.[a-z0-9]+$)', '', path)
+    path = re.sub(r'/(?:w|h)_\d+(?:,[^/]+)*/', '/', path)
+    return ((parsed.hostname or '').lower().removeprefix('www.'), path)
+
+def saved_image_allowed(item):
+    """Apply filters that remain available when rendering cached selections."""
+    markers = ' '.join(str(item.get(k, '')) for k in ('src', 'alt', 'title'))
+    if re.search(r'(logo|avatar|tracking|pixel|icon|badge|button|masthead|site[-_]?header|branding)', markers, re.I):
+        return False
+    if item.get('width') and item.get('height') and item['width'] / item['height'] > 4.5:
+        return False
+    return True
+
 def unique(images, count):
     seen, result = set(), []
     for item in images:
-        if item and item['src'] not in seen:
-            seen.add(item['src']); result.append(item)
+        identity = image_identity(item['src']) if item else None
+        if item and identity not in seen:
+            seen.add(identity); result.append(item)
             if len(result) == count:
                 break
     return result
@@ -180,7 +226,7 @@ def linked_images(doc, site):
             article = url(parent.attrs['href'], site['url'])
         except ValueError:
             continue
-        if not same_site(article, site['url']) or article == site['url']:
+        if not same_site(article, site['url']) or article == site['url'] or homepage_alias(article) or image_url(article):
             continue
         title = n.attrs.get('alt') or parent.attrs.get('title') or site['name']
         result.append(image(n, site['url'], title, article))
@@ -206,7 +252,7 @@ def article_links(doc, site):
         except ValueError:
             continue
         path = urlsplit(address).path
-        if address in seen or not same_site(address, site['url']) or address == site['url'] or reject.search(path):
+        if address in seen or not same_site(address, site['url']) or address == site['url'] or homepage_alias(address) or image_url(address) or reject.search(path):
             continue
         seen.add(address)
         # Dated and deeper URLs are more likely to be editorial pages.
@@ -343,7 +389,7 @@ def render(cfg, records, output, updated_on=None):
     sites = sorted(cfg['sites'], key=lambda site: records.get(site['id'], {}).get('updated_at') or '', reverse=True)
     for idx, site in enumerate(sites):
         record = records.get(site['id'], {})
-        photos = record.get('images', [])[:site['images']]
+        photos = unique((photo for photo in record.get('images', []) if saved_image_allowed(photo)), site['images'])
         name, href = escape(site['name']), escape(url(site['url']), quote=True)
         if not photos:
             continue
