@@ -8,8 +8,8 @@ a{color:inherit;text-underline-offset:4px}
 header{max-width:1800px;margin:auto;padding:32px 0 25px;display:flex;justify-content:space-between;gap:16px;align-items:baseline;border-bottom:1px solid #dedede}
 h1{font-size:clamp(1.5rem,3vw,2.25rem);font-weight:500;letter-spacing:-.055em;line-height:1.1;margin:0}
 .edition{font-size:.875rem;color:var(--muted);margin:0;white-space:nowrap}
-main{max-width:1800px;margin:22px auto 0;columns:3;column-gap:var(--gap)}
-.tile{break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid;margin:0 0 var(--gap);display:block;position:relative;overflow:hidden}
+main{max-width:1800px;margin:22px auto 0;columns:3;column-gap:var(--gap);font-size:0}
+.tile{break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid;width:100%;margin:0 0 var(--gap);display:inline-block;vertical-align:top;position:relative;overflow:hidden;font-size:1rem}
 .card-toggle{position:absolute;width:1px;height:1px;margin:-1px;clip-path:inset(50%);overflow:hidden;white-space:nowrap}
 .card{position:relative}
 .card-toggle:focus-visible+.card{outline:3px solid #144dff;outline-offset:3px}
