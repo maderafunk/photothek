@@ -1,41 +1,18 @@
 # Edit this file to adjust the website sources. A push on Github rebuilds the gallery immediately.
-title: Phototek
+title: Photothek
+# Adding a publication requires these two fields.
 sites:
-  - id: american-suburb-x
-    name: American Suburb X
-    url: https://americansuburbx.com/
-    feed: https://americansuburbx.com/feed/
-    mode: feed
-    images: 3
-  - id: flakphoto
-    name: FlakPhoto Digest
-    url: https://www.flakphoto.news/
-    feed: https://www.flakphoto.news/feed
-    mode: feed
-    images: 2
-  - id: fototapeta
-    name: FOTOTAPETA
-    url: https://fototapeta.art.pl/
-    mode: fototapeta
-    images: 3
-  - id: f-stop
-    name: F-Stop Magazine
-    url: https://fstopmagazine.com/
-    mode: fstop
-    images: 1
-  - id: lensculture
-    name: LensCulture
-    url: https://www.lensculture.com/
-    mode: lensculture
-    images: 3
-#  - id: smbh
-#    name: Super Massive Black Hole
-#    url: https://smbhmag.com/
-#    mode: fstop
-#    images: 1
-#  - id: burn
-#   name: Burn Magazine
-#    url: https://www.burnmagazine.org/
-#    feed: https://www.burnmagazine.org/feed
-#    mode: feed
-#    images: 3
+  - name: American Suburb X
+    link: https://americansuburbx.com/
+  - name: FlakPhoto Digest
+    link: https://www.flakphoto.news/
+  - name: FOTOTAPETA
+    link: https://fototapeta.art.pl/
+  - name: F-Stop Magazine
+    link: https://fstopmagazine.com/
+  - name: LensCulture
+    link: https://www.lensculture.com/
+  - name: Super Massive Black Hole
+    link: https://smbhmag.com/
+  - name: Burn Magazine
+    link: https://www.burnmagazine.org/
