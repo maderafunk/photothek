@@ -72,6 +72,27 @@ class GalleryTests(unittest.TestCase):
         self.assertIn('<time datetime="2026-09-17">2026-09-17</time>', html)
         self.assertNotIn('2026-09-17T', html)
 
+    def test_render_orders_newest_updated_tile_first(self):
+        older = {'id': 'older', 'url': 'https://older.example/', 'name': 'Older', 'images': 3}
+        newer = {'id': 'newer', 'url': 'https://newer.example/', 'name': 'Newer', 'images': 3}
+        records = {
+            'older': {'updated_at': '2026-09-01T12:00:00+00:00', 'images': [{'src': 'https://older.example/photo.jpg'}]},
+            'newer': {'updated_at': '2026-09-17T12:00:00+00:00', 'images': [{'src': 'https://newer.example/photo.jpg'}]},
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            build.render({'sites': [older, newer]}, records, Path(tmp), updated_on='2026-09-17')
+            doc = build.Document((Path(tmp) / 'index.html').read_text()).root
+        self.assertEqual([node.attrs['id'] for node in doc.walk('input')], ['tile-newer', 'tile-older'])
+
+    def test_render_orders_footer_links_alphabetically(self):
+        zulu = {'id': 'zulu', 'url': 'https://zulu.example/', 'name': 'Zulu', 'images': 3}
+        alpha = {'id': 'alpha', 'url': 'https://alpha.example/', 'name': 'alpha', 'images': 3}
+        with tempfile.TemporaryDirectory() as tmp:
+            build.render({'sites': [zulu, alpha]}, {}, Path(tmp), updated_on='2026-09-17')
+            doc = build.Document((Path(tmp) / 'index.html').read_text()).root
+        nav = next(doc.walk('nav'))
+        self.assertEqual([node.text() for node in nav.walk('a')], ['alpha', 'Zulu'])
+
     def test_tile_uses_css_only_card_toggle(self):
         site = {'id': 'example', 'url': 'https://example.com/', 'name': 'Example', 'images': 3}
         records = {'example': {'images': [{'src': 'https://example.com/photo.jpg'}]}}
