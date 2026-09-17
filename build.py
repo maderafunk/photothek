@@ -161,6 +161,60 @@ def article_image(client, address, title):
         if n.attrs.get('property') == 'og:image':
             return image(Node('img', {'src': n.attrs.get('content')}), address, title, address)
 
+def same_site(address, homepage):
+    """Treat www.example.com and example.com as the same publication."""
+    def host(value):
+        return (urlsplit(value).hostname or '').lower().removeprefix('www.')
+    return host(address) == host(homepage)
+
+def linked_images(doc, site):
+    """Images that link to an article are usually homepage editorial cards."""
+    result = []
+    for n in doc.walk('img'):
+        parent = n.parent
+        while parent and parent.tag != 'a':
+            parent = parent.parent
+        if not parent or not parent.attrs.get('href'):
+            continue
+        try:
+            article = url(parent.attrs['href'], site['url'])
+        except ValueError:
+            continue
+        if not same_site(article, site['url']) or article == site['url']:
+            continue
+        title = n.attrs.get('alt') or parent.attrs.get('title') or site['name']
+        result.append(image(n, site['url'], title, article))
+    return unique(result, site['images'])
+
+def metadata_images(doc, site):
+    """Use standard publisher metadata before falling back to unscoped images."""
+    result = []
+    for n in doc.walk('meta'):
+        key = (n.attrs.get('property') or n.attrs.get('name') or '').lower()
+        if key in ('og:image', 'og:image:url', 'twitter:image', 'twitter:image:src'):
+            result.append(image(Node('img', {'src': n.attrs.get('content')}),
+                                site['url'], site['name'], site['url']))
+    return unique(result, site['images'])
+
+def article_links(doc, site):
+    """Rank plausible article links for sites whose cards use CSS backgrounds."""
+    ranked, seen = [], set()
+    reject = re.compile(r'/(?:about|contact|privacy|login|account|shop|category|tag|author)(?:/|$)', re.I)
+    for n in doc.walk('a'):
+        try:
+            address = url(n.attrs.get('href'), site['url'])
+        except ValueError:
+            continue
+        path = urlsplit(address).path
+        if address in seen or not same_site(address, site['url']) or address == site['url'] or reject.search(path):
+            continue
+        seen.add(address)
+        # Dated and deeper URLs are more likely to be editorial pages.
+        score = (3 if re.search(r'/20\d\d/', path) else 0) + path.strip('/').count('/') + (1 if n.text() else 0)
+        ranked.append((score, address, n.text() or site['name']))
+    ranked.sort(key=lambda item: item[0], reverse=True)
+    return ranked
+
 def feed_images(client, site):
     body = client.get(site['feed'])
     if '<!DOCTYPE' in body.upper():
@@ -214,37 +268,51 @@ def feed_images(client, site):
     return unique(result, site['images'])
 
 def discover(client, site):
-    mode = site.get('mode', 'auto')
-    if mode == 'feed' or mode == 'auto' and site.get('feed'):
-        return feed_images(client, site)
     doc = Document(client.get(site['url'])).root
-    if mode == 'auto':
-        for n in doc.walk('link'):
-            if n.attrs.get('type') in ('application/rss+xml', 'application/atom+xml'):
-                return feed_images(client, {**site, 'feed': url(n.attrs['href'], site['url'])})
-    result = []
-    for n in doc.walk('img'):
-        source = n.attrs.get('src', '')
-        parent = n.parent
-        while parent and parent.tag != 'a':
-            parent = parent.parent
-        article = url(parent.attrs.get('href'), site['url']) if parent and parent.attrs.get('href') else site['url']
-        title = n.attrs.get('alt') or site['name']
-        if mode == 'fototapeta' and not re.search(r'/20\d{2}/i/', '/' + source):
+    # Each strategy is independent: a broken or blocked feed must not prevent
+    # the HTML strategies from running.
+    feeds = []
+    for n in doc.walk('link'):
+        if n.attrs.get('type', '').split(';')[0].strip() in ('application/rss+xml', 'application/atom+xml'):
+            try:
+                feeds.append(url(n.attrs.get('href'), site['url']))
+            except ValueError:
+                pass
+    base = urljoin(site['url'], '/')
+    feeds.extend(urljoin(base, path) for path in ('feed', 'feed.xml', 'rss.xml'))
+    photos = []
+    for feed in dict.fromkeys(feeds):
+        try:
+            photos = unique(photos + feed_images(client, {**site, 'feed': feed}), site['images'])
+            if len(photos) == site['images']:
+                return photos
+        except Exception:
             continue
-        if mode == 'fstop' and not re.search(r'cover\d+\.', source):
+
+    photos = unique(photos + linked_images(doc, site), site['images'])
+    if len(photos) == site['images']:
+        return photos
+    photos = unique(photos + metadata_images(doc, site), site['images'])
+    if len(photos) == site['images']:
+        return photos
+
+    # Some modern sites render thumbnails as CSS backgrounds. Probe their
+    # most article-like links and extract the first photograph on each page.
+    for _, address, title in article_links(doc, site):
+        if len(client.used) >= 8:
+            break
+        try:
+            photos.append(article_image(client, address, title))
+        except Exception:
             continue
-        if mode == 'lensculture':
-            if 'recent-articles--cover-photo' not in n.attrs.get('class', '') or '/articles/' not in article:
-                continue
-            title = title.split(', Photography Competition')[0]
-        found = image(n, site['url'], title, article)
-        if found:
-            # FOTOTAPETA often omits image alt text; retain its publisher label.
-            if mode == 'lensculture':
-                found['alt'] = title
-            result.append(found)
-    return unique(result, site['images'])
+        photos = unique(photos, site['images'])
+        if len(photos) == site['images']:
+            return photos
+
+    # Last resort for simple portfolio pages with unlinked photographs.
+    photos.extend(image(n, site['url'], n.attrs.get('alt') or site['name'], site['url'])
+                  for n in doc.walk('img'))
+    return unique(photos, site['images'])
 
 def config(path):
     value = yaml.safe_load(path.read_text())
@@ -252,23 +320,21 @@ def config(path):
         raise ValueError('sites.yml must contain a nonempty sites list')
     ids = set()
     for s in value['sites']:
+        if not isinstance(s, dict):
+            raise ValueError('Each site must be a mapping with name and link')
+        extra = set(s) - {'name', 'link'}
+        if extra:
+            raise ValueError('Unknown site fields: ' + ', '.join(sorted(extra)) + '; use only name and link')
+        if not isinstance(s.get('name'), str) or not s['name'].strip():
+            raise ValueError('Each site needs a name')
+        s['id'] = re.sub(r'[^a-z0-9]+', '-', s['name'].lower()).strip('-')
         if not re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*', str(s.get('id', ''))):
-            raise ValueError('Each site needs a lowercase id, such as flakphoto')
+            raise ValueError('Site names must contain letters or numbers')
         if s['id'] in ids:
             raise ValueError('Duplicate site id: ' + s['id'])
         ids.add(s['id'])
-        if not isinstance(s.get('name'), str) or not s['name'].strip():
-            raise ValueError('Each site needs a name')
-        s['url'] = url(s['url'])
-        if s.get('feed'):
-            s['feed'] = url(s['feed'])
-        s.setdefault('images', 3)
-        if type(s['images']) is not int or not 1 <= s['images'] <= 6:
-            raise ValueError('images must be an integer from 1 to 6')
-        if s.get('mode', 'auto') not in ('auto', 'feed', 'fototapeta', 'fstop', 'lensculture'):
-            raise ValueError('Unknown discovery mode')
-        if s.get('mode') == 'feed' and not s.get('feed'):
-            raise ValueError('feed mode requires a feed URL')
+        s['url'] = url(s.get('link'))
+        s['images'] = 3
     return value
 
 def render(cfg, records, output):
