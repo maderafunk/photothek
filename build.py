@@ -359,7 +359,7 @@ def render(cfg, records, output, updated_on=None):
 <input class="card-toggle" type="checkbox" id="{control}" aria-label="Show details for {name}">
 <div class="card">
 <label class="card-front" for="{control}"><span class="pictures{klass}">{"".join(imgs)}</span></label>
-<div class="card-back"><label class="card-close" for="{control}" aria-label="Return to photographs"></label><a href="{href}">{name}<span aria-hidden="true"> ↗</span></a></div>
+<div class="card-back"><label class="card-close" for="{control}" aria-label="Return to photographs"></label><a href="{href}">{name}<svg class="external-arrow" aria-hidden="true" viewBox="0 0 16 16"><path d="M3 13 13 3M6 3h7v7"/></svg></a></div>
 </div></article>''')
     links = ' '.join(f'<a href="{escape(s["url"], quote=True)}">{escape(s["name"])}</a>' for s in cfg['sites'])
     title = escape(str(cfg.get('title', 'Photography Wall')))
@@ -368,7 +368,7 @@ def render(cfg, records, output, updated_on=None):
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https: http:; style-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="description" content="A photographic wall linking to independent photography publications and their recent work.">
-<title>{title}</title><link rel="stylesheet" href="style.css?v=crossfade-columns-1"></head>
+<title>{title}</title><link rel="stylesheet" href="style.css?v=vector-arrow-1"></head>
 <body><a class="skip" href="#gallery">Skip to photographs</a>
 <header><h1>{title}</h1><p class="edition">{len(cfg['sites']):02d} publications</p></header>
 <main id="gallery" aria-label="Photography publications">{''.join(tiles)}</main>
