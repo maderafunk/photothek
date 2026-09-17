@@ -426,6 +426,9 @@ def config(path):
     value = yaml.safe_load(path.read_text())
     if not isinstance(value, dict) or not isinstance(value.get('sites'), list) or not value['sites']:
         raise ValueError('sites.yml must contain a nonempty sites list')
+    images_per_site = value.setdefault('images_per_site', 3)
+    if type(images_per_site) is not int or not 1 <= images_per_site <= 6:
+        raise ValueError('images_per_site must be an integer from 1 to 6')
     ids = set()
     for s in value['sites']:
         if not isinstance(s, dict):
@@ -442,34 +445,36 @@ def config(path):
             raise ValueError('Duplicate site id: ' + s['id'])
         ids.add(s['id'])
         s['url'] = url(s.get('link'))
-        s['images'] = 3
+        s['images'] = images_per_site
     return value
 
 def render(cfg, records, output, updated_on=None):
     updated_on = updated_on or datetime.now(timezone.utc).date().isoformat()
-    tiles = []
+    groups = []
+    image_index = 0
     sites = sorted(cfg['sites'], key=lambda site: records.get(site['id'], {}).get('updated_at') or '', reverse=True)
-    for idx, site in enumerate(sites):
+    for site in sites:
         record = records.get(site['id'], {})
         photos = unique((photo for photo in record.get('images', []) if saved_image_allowed(photo)), site['images'])
         name, href = escape(site['name']), escape(url(site['url']), quote=True)
         if not photos:
             continue
-        imgs = []
+        tiles = []
         for j, photo in enumerate(photos):
             dims = ''
             if photo.get('width') and photo.get('height'):
                 dims = f' width="{int(photo["width"])}" height="{int(photo["height"])}"'
-            loading = 'eager' if idx < 3 and j == 0 else 'lazy'
-            imgs.append(f'<img src="{escape(url(photo["src"]), quote=True)}" alt="{escape(photo.get("alt") or site["name"], quote=True)}" loading="{loading}" decoding="async"{dims}>')
-        klass = ' two' if len(photos) == 2 else ''
-        control = f'tile-{site["id"]}'
-        tiles.append(f'''<article class="tile">
-<input class="card-toggle" type="checkbox" id="{control}" aria-label="Show details for {name}">
+            loading = 'eager' if image_index < 3 else 'lazy'
+            image_index += 1
+            img = f'<img src="{escape(url(photo["src"]), quote=True)}" alt="{escape(photo.get("alt") or site["name"], quote=True)}" loading="{loading}" decoding="async"{dims}>'
+            control = f'tile-{site["id"]}-{j + 1}'
+            tiles.append(f'''<article class="tile">
+<input class="detail-toggle" type="radio" name="selected-card" id="{control}" aria-label="Show details for {name}">
 <div class="card">
-<label class="card-front" for="{control}"><span class="pictures{klass}">{"".join(imgs)}</span></label>
-<div class="card-back"><span class="pictures{klass} back-pictures" aria-hidden="true">{"".join(imgs)}</span><label class="card-close" for="{control}" aria-label="Return to photographs"></label><a href="{href}" target="_blank" rel="noopener noreferrer">{name}<svg class="external-arrow" aria-hidden="true" viewBox="0 0 16 16"><path d="M3 13 13 3M6 3h7v7"/></svg></a></div>
+<label class="card-front" for="{control}">{img}</label>
+<div class="card-back"><span class="back-picture" aria-hidden="true">{img}</span><label class="card-close" for="cards-closed" aria-label="Return to photographs"></label><a href="{href}" target="_blank" rel="noopener noreferrer">{name}<svg class="external-arrow" aria-hidden="true" viewBox="0 0 16 16"><path d="M3 13 13 3M6 3h7v7"/></svg></a></div>
 </div></article>''')
+        groups.append(f'<section class="magazine-group" aria-label="{name}">{"".join(tiles)}</section>')
     footer_sites = sorted(cfg['sites'], key=lambda site: site['name'].casefold())
     links = ' '.join(f'<a href="{escape(s["url"], quote=True)}" target="_blank" rel="noopener noreferrer">{escape(s["name"])}</a>' for s in footer_sites)
     title = escape(str(cfg.get('title', 'Photography Wall')))
@@ -478,10 +483,10 @@ def render(cfg, records, output, updated_on=None):
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https: http:; style-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="description" content="A photographic wall linking to independent photography publications and their recent work.">
-<title>{title}</title><link rel="stylesheet" href="style.css?v=equal-image-gaps-1"></head>
+<title>{title}</title><link rel="stylesheet" href="style.css?v=image-tiles-1"></head>
 <body><a class="skip" href="#gallery">Skip to photographs</a>
 <header><h1>{title}</h1><p class="edition">{len(cfg['sites']):02d} publications</p></header>
-<main id="gallery" aria-label="Photography publications">{''.join(tiles)}</main>
+<main id="gallery" aria-label="Photography publications"><input class="close-toggle" type="radio" name="selected-card" id="cards-closed" checked>{''.join(groups)}</main>
 <footer><p>Photographs belong to their respective creators.</p><nav aria-label="Publications">{links}</nav><p class="updated">Last updated: <time datetime="{updated_on}">{updated_on}</time></p></footer>
 </body></html>\n'''
     (output / 'index.html').write_text(content)
