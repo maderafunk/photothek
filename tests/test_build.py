@@ -98,9 +98,15 @@ class GalleryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             build.render({'sites': [site]}, {}, Path(tmp), updated_on='2026-09-17')
             html = (Path(tmp) / 'index.html').read_text()
-            favicon = Path(tmp) / 'favicon.svg'
-            self.assertTrue(favicon.exists())
-        self.assertIn('<link rel="icon" href="favicon.svg?v=4" type="image/svg+xml">', html)
+            for filename in ('favicon.svg', 'favicon.png', 'favicon.ico', 'apple-touch-icon.png'):
+                self.assertTrue((Path(tmp) / filename).exists())
+        self.assertIn('<link rel="icon" href="favicon.svg?v=6" type="image/svg+xml">', html)
+        self.assertIn('<link rel="icon" href="favicon.png?v=6" type="image/png" sizes="64x64">', html)
+        self.assertIn('<link rel="shortcut icon" href="favicon.ico?v=6">', html)
+        self.assertIn('<link rel="apple-touch-icon" href="apple-touch-icon.png?v=6">', html)
+        self.assertIn('<svg class="site-logo" aria-hidden="true"', html)
+        self.assertIn('<input class="theme-toggle" type="checkbox" id="theme-toggle"', html)
+        self.assertIn('<label class="theme-switch" for="theme-toggle"', html)
 
     def test_render_orders_newest_updated_tile_first(self):
         older = {'id': 'older', 'url': 'https://older.example/', 'name': 'Older', 'images': 3}
@@ -145,7 +151,7 @@ class GalleryTests(unittest.TestCase):
         link = next(node for node in doc.walk('a') if node.attrs.get('href') == 'https://example.com/')
         self.assertEqual(link.attrs['target'], '_blank')
         self.assertEqual(link.attrs['rel'], 'noopener noreferrer')
-        arrow = next(doc.walk('svg'))
+        arrow = next(node for node in doc.walk('svg') if node.attrs.get('class') == 'external-arrow')
         self.assertEqual(arrow.attrs['class'], 'external-arrow')
         backs = [node for node in doc.walk() if 'back-picture' in node.attrs.get('class', '').split()]
         self.assertEqual(len(backs), 2)
