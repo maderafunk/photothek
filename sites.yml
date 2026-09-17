@@ -4,15 +4,45 @@ title: Photothek
 sites:
   - name: American Suburb X
     link: https://americansuburbx.com/
+    
   - name: FlakPhoto Digest
     link: https://www.flakphoto.news/
+    
   - name: FOTOTAPETA
     link: https://fototapeta.art.pl/
+    
   - name: F-Stop Magazine
     link: https://fstopmagazine.com/home.html
+    
   - name: LensCulture
     link: https://www.lensculture.com/
+    
   - name: Super Massive Black Hole
     link: https://smbhmag.com/
+    
   - name: Burn Magazine
     link: https://www.burnmagazine.org/
+    
+ - name: Der Greif
+    link: https://dergreif.org/
+    
+  - name: LENSCRATCH
+    link: https://lenscratch.com/
+    
+  - name: Urbanautica
+    link: https://urbanautica.com/
+    
+  - name: PHROOM
+    link: https://phroomplatform.com/
+    
+  - name: 1000 Words
+    link: https://www.1000wordsmag.com/
+    
+  - name: C4 Journal
+    link: https://c4journal.com/
+    
+  - name: GUP Magazine
+    link: https://gupmagazine.com/
+    
+  - name: PhotoBook Journal
+    link: https://photobookjournal.com/
