@@ -53,6 +53,13 @@ class GalleryTests(unittest.TestCase):
         node = build.Node('img', {'src': '/a.jpg', 'srcset': 'https://example.com/image/w_320,q_auto/a.jpg 320w, https://example.com/image/w_640,q_auto/a.jpg 640w, https://example.com/image/w_1200,q_auto/a.jpg 1200w'})
         self.assertEqual(build.image(node, 'https://example.com')['src'], 'https://example.com/image/w_640,q_auto/a.jpg')
 
+    def test_header_images_and_resized_duplicates_are_excluded(self):
+        markup = '''<header><img src="/hero.jpg" width="1200" height="300"></header>
+        <main><img src="/work-400x300.jpg"><img src="/work-1200x900.jpg"></main>'''
+        doc = build.Document(markup).root
+        photos = build.unique((build.image(node, 'https://example.com/') for node in doc.walk('img')), 3)
+        self.assertEqual([photo['src'] for photo in photos], ['https://example.com/work-400x300.jpg'])
+
     def test_source_text_cannot_inject_scripts(self):
         site = {'id': 'example', 'url': 'https://example.com/', 'name': '<script>alert(1)</script>', 'images': 1}
         records = {'example': {'images': [{'src': 'https://example.com/photo.jpg', 'alt': '\" onerror=\"alert(1)'}]}}
