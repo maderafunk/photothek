@@ -64,5 +64,26 @@ class GalleryTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             build.url('javascript:alert(1)')
 
+    def test_render_includes_date_without_time(self):
+        site = {'id': 'example', 'url': 'https://example.com/', 'name': 'Example', 'images': 3}
+        with tempfile.TemporaryDirectory() as tmp:
+            build.render({'sites': [site]}, {}, Path(tmp), updated_on='2026-09-17')
+            html = (Path(tmp) / 'index.html').read_text()
+        self.assertIn('<time datetime="2026-09-17">2026-09-17</time>', html)
+        self.assertNotIn('2026-09-17T', html)
+
+    def test_tile_uses_css_only_flip_control(self):
+        site = {'id': 'example', 'url': 'https://example.com/', 'name': 'Example', 'images': 3}
+        records = {'example': {'images': [{'src': 'https://example.com/photo.jpg'}]}}
+        with tempfile.TemporaryDirectory() as tmp:
+            build.render({'sites': [site]}, records, Path(tmp), updated_on='2026-09-17')
+            doc = build.Document((Path(tmp) / 'index.html').read_text()).root
+        toggle = next(doc.walk('input'))
+        self.assertEqual(toggle.attrs['type'], 'checkbox')
+        self.assertEqual(toggle.attrs['id'], 'tile-example')
+        self.assertEqual(next(doc.walk('label')).attrs['for'], 'tile-example')
+        links = [node.attrs['href'] for node in doc.walk('a')]
+        self.assertIn('https://example.com/', links)
+
 if __name__ == '__main__':
     unittest.main()
