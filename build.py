@@ -481,18 +481,19 @@ def render(cfg, records, output, updated_on=None):
     output.mkdir(parents=True, exist_ok=True)
     content = f'''<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https: http:; style-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' https: http:; style-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="description" content="A photographic wall linking to independent photography publications and their recent work.">
-<title>{title}</title><link rel="stylesheet" href="style.css?v=footer-no-divider-1"></head>
+<title>{title}</title><link rel="icon" href="favicon.svg?v=4" type="image/svg+xml"><link rel="stylesheet" href="style.css?v=favicon-1"></head>
 <body><a class="skip" href="#gallery">Skip to photographs</a>
 <header><h1>{title}</h1><p class="edition">{len(cfg['sites']):02d} publications</p></header>
 <main id="gallery" aria-label="Photography publications"><input class="close-toggle" type="radio" name="selected-card" id="cards-closed" checked>{''.join(groups)}</main>
 <footer><p>Photographs belong to their respective creators.</p><nav aria-label="Publications">{links}</nav><p class="updated">{title} is updated every Friday. Last update: <time datetime="{updated_on}">{updated_on}</time></p></footer>
 </body></html>\n'''
     (output / 'index.html').write_text(content)
-    css = ROOT / 'dist' / 'style.css'
-    if output.resolve() != css.parent.resolve():
-        (output / 'style.css').write_text(css.read_text())
+    assets = ROOT / 'dist'
+    if output.resolve() != assets.resolve():
+        for filename in ('style.css', 'favicon.svg'):
+            (output / filename).write_text((assets / filename).read_text())
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
