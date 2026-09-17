@@ -5,8 +5,8 @@ on:
     branches: [main]
   workflow_dispatch:
   schedule:
-    # Daily, away from the busy start of the hour (UTC).
-    - cron: '23 6 * * *'
+    # Weekly on Friday morning, away from the busy start of the hour (UTC).
+    - cron: '23 6 * * 5'
 
 permissions:
   contents: read
