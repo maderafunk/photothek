@@ -72,7 +72,7 @@ class GalleryTests(unittest.TestCase):
         self.assertIn('<time datetime="2026-09-17">2026-09-17</time>', html)
         self.assertNotIn('2026-09-17T', html)
 
-    def test_tile_uses_css_only_flip_control(self):
+    def test_tile_uses_css_only_card_toggle(self):
         site = {'id': 'example', 'url': 'https://example.com/', 'name': 'Example', 'images': 3}
         records = {'example': {'images': [{'src': 'https://example.com/photo.jpg'}]}}
         with tempfile.TemporaryDirectory() as tmp:
