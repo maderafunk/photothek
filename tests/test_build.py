@@ -77,13 +77,17 @@ class GalleryTests(unittest.TestCase):
         records = {'example': {'images': [{'src': 'https://example.com/photo.jpg'}]}}
         with tempfile.TemporaryDirectory() as tmp:
             build.render({'sites': [site]}, records, Path(tmp), updated_on='2026-09-17')
-            doc = build.Document((Path(tmp) / 'index.html').read_text()).root
+            html = (Path(tmp) / 'index.html').read_text()
+            doc = build.Document(html).root
         toggle = next(doc.walk('input'))
         self.assertEqual(toggle.attrs['type'], 'checkbox')
         self.assertEqual(toggle.attrs['id'], 'tile-example')
         self.assertEqual(next(doc.walk('label')).attrs['for'], 'tile-example')
         links = [node.attrs['href'] for node in doc.walk('a')]
         self.assertIn('https://example.com/', links)
+        arrow = next(doc.walk('svg'))
+        self.assertEqual(arrow.attrs['class'], 'external-arrow')
+        self.assertNotIn('↗', html)
 
 if __name__ == '__main__':
     unittest.main()
