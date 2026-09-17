@@ -84,6 +84,7 @@ class Client:
         self.path = ROOT / '.cache' / (site_id + '.json')
         self.cache = load_json(self.path, {})
         self.used = {}
+        self.probed = 0
     def get(self, address):
         address = url(address)
         if address in self.used:
@@ -109,9 +110,70 @@ class Client:
             body = old['body']
         self.used[address] = body
         return body
+    def dimensions(self, address):
+        """Read just enough image bytes to determine its intrinsic size."""
+        if self.probed >= 6:
+            return None
+        self.probed += 1
+        address = url(address)
+        headers = {
+            'User-Agent': 'PhotographyWall/1.0 (static photography link gallery)',
+            'Accept': 'image/avif,image/webp,image/png,image/jpeg,image/gif,*/*;q=0.1',
+            'Range': 'bytes=0-262143',
+        }
+        with urlopen(Request(address, headers=headers), timeout=20) as response:
+            raw = response.read(262_145)
+        return image_dimensions(raw)
     def save(self):
         # Bound cache size to URLs used in this build; article bodies contain no image bytes.
         write_json(self.path, {k: self.cache[k] for k in self.used if k in self.cache})
+
+def image_dimensions(raw):
+    """Return (width, height) for common web image headers."""
+    if raw.startswith(b'\x89PNG\r\n\x1a\n') and len(raw) >= 24:
+        return int.from_bytes(raw[16:20], 'big'), int.from_bytes(raw[20:24], 'big')
+    if raw[:3] in (b'GIF',) and len(raw) >= 10:
+        return int.from_bytes(raw[6:8], 'little'), int.from_bytes(raw[8:10], 'little')
+    if raw.startswith(b'\xff\xd8'):
+        position = 2
+        sof = {0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf}
+        while position + 9 <= len(raw):
+            if raw[position] != 0xff:
+                position += 1
+                continue
+            while position < len(raw) and raw[position] == 0xff:
+                position += 1
+            if position >= len(raw):
+                break
+            marker = raw[position]
+            position += 1
+            if marker in sof and position + 7 <= len(raw):
+                return int.from_bytes(raw[position + 5:position + 7], 'big'), int.from_bytes(raw[position + 3:position + 5], 'big')
+            if marker in (0x01, 0xd8, 0xd9) or 0xd0 <= marker <= 0xd7:
+                continue
+            if position + 2 > len(raw):
+                break
+            length = int.from_bytes(raw[position:position + 2], 'big')
+            if length < 2:
+                break
+            position += length
+    if raw.startswith(b'RIFF') and raw[8:12] == b'WEBP' and len(raw) >= 30:
+        kind = raw[12:16]
+        if kind == b'VP8X':
+            return 1 + int.from_bytes(raw[24:27], 'little'), 1 + int.from_bytes(raw[27:30], 'little')
+        if kind == b'VP8 ' and raw[23:26] == b'\x9d\x01\x2a':
+            return int.from_bytes(raw[26:28], 'little') & 0x3fff, int.from_bytes(raw[28:30], 'little') & 0x3fff
+        if kind == b'VP8L' and raw[20] == 0x2f:
+            bits = int.from_bytes(raw[21:25], 'little')
+            return (bits & 0x3fff) + 1, ((bits >> 14) & 0x3fff) + 1
+    # AVIF stores display dimensions in an Image Spatial Extents property.
+    position = raw.find(b'ispe')
+    if position >= 4 and position + 16 <= len(raw):
+        width = int.from_bytes(raw[position + 8:position + 12], 'big')
+        height = int.from_bytes(raw[position + 12:position + 16], 'big')
+        if width and height:
+            return width, height
+    return None
 
 def decorative_context(node):
     """Identify images placed in site chrome rather than editorial content."""
@@ -445,6 +507,16 @@ def main():
             photos = discover(client, site)
             if not photos:
                 raise ValueError('No suitable images discovered')
+            for photo in photos:
+                if not photo.get('width') or not photo.get('height'):
+                    try:
+                        dimensions = client.dimensions(photo['src'])
+                        if dimensions and all(0 < value <= 100_000 for value in dimensions):
+                            photo['width'], photo['height'] = dimensions
+                    except Exception:
+                        # Dimensions improve layout but are not required to keep
+                        # an otherwise valid photograph.
+                        pass
             record = {'url': site['url'], 'checked_at': NOW(), 'updated_at': NOW(), 'images': photos, 'error': None}
             if photos == previous.get('images'):
                 record['updated_at'] = previous.get('updated_at', record['updated_at'])
