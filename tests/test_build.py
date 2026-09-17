@@ -10,6 +10,36 @@ class FakeClient:
         return self.pages[address]
 
 class GalleryTests(unittest.TestCase):
+    def test_minimal_config_generates_id_and_defaults(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'sites.yml'
+            path.write_text('sites:\n  - name: Example Magazine\n    link: https://example.com/\n')
+            site = build.config(path)['sites'][0]
+        self.assertEqual(site['id'], 'example-magazine')
+        self.assertEqual(site['url'], 'https://example.com/')
+        self.assertEqual(site['images'], 3)
+
+    def test_legacy_site_fields_are_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'sites.yml'
+            path.write_text('sites:\n  - name: Example\n    url: https://example.com/\n    mode: feed\n')
+            with self.assertRaisesRegex(ValueError, 'use only name and link'):
+                build.config(path)
+
+    def test_auto_continues_after_broken_feed(self):
+        homepage = '''<link rel="alternate" type="application/rss+xml" href="/bad-feed">
+        <a href="/stories/one"><img data-src="/photo.jpg" alt="Story"></a>'''
+        site = {'url': 'https://example.com/', 'name': 'Example', 'images': 1}
+        photos = build.discover(FakeClient({
+            site['url']: homepage,
+            'https://example.com/bad-feed': '<not xml',
+            'https://example.com/feed': '<not xml',
+            'https://example.com/feed.xml': '<not xml',
+            'https://example.com/rss.xml': '<not xml',
+        }), site)
+        self.assertEqual(photos[0]['src'], 'https://example.com/photo.jpg')
+        self.assertEqual(photos[0]['article'], 'https://example.com/stories/one')
+
     def test_feed_uses_publication_order_not_document_order(self):
         feed = '''<rss><channel>
           <item><title>Old</title><link>https://example.com/old</link><pubDate>Mon, 01 Jun 2026 10:00:00 GMT</pubDate><description>&lt;img src="/old.jpg"&gt;</description></item>
@@ -22,13 +52,6 @@ class GalleryTests(unittest.TestCase):
     def test_cdn_srcset_commas_are_preserved(self):
         node = build.Node('img', {'src': '/a.jpg', 'srcset': 'https://example.com/image/w_320,q_auto/a.jpg 320w, https://example.com/image/w_640,q_auto/a.jpg 640w, https://example.com/image/w_1200,q_auto/a.jpg 1200w'})
         self.assertEqual(build.image(node, 'https://example.com')['src'], 'https://example.com/image/w_640,q_auto/a.jpg')
-
-    def test_lensculture_excludes_advertising(self):
-        markup = '''<a href="/awards"><img class="recent-articles--cover-photo" src="/ad.jpg"></a>
-        <a href="/articles/story"><img class="recent-articles--cover-photo" src="/photo.jpg" alt="Story"></a>'''
-        site = {'url': 'https://example.com/', 'name': 'Example', 'mode': 'lensculture', 'images': 3}
-        photos = build.discover(FakeClient({site['url']: markup}), site)
-        self.assertEqual([p['src'] for p in photos], ['https://example.com/photo.jpg'])
 
     def test_source_text_cannot_inject_scripts(self):
         site = {'id': 'example', 'url': 'https://example.com/', 'name': '<script>alert(1)</script>', 'images': 1}
