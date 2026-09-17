@@ -25,6 +25,7 @@ main{max-width:1800px;margin:22px auto 0;columns:3;column-gap:var(--gap)}
 footer{max-width:1800px;margin:22px auto 0;border-top:1px solid #dedede;padding:20px 0 28px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:.875rem;line-height:1.5}
 footer p{margin:0}
 footer nav{display:flex;gap:10px 18px;flex-wrap:wrap}
+footer .updated{flex-basis:100%;font-size:.75rem}
 @media(hover:hover) and (pointer:fine){.caption{opacity:0}.tile-link:hover .caption,.tile-link:focus .caption{opacity:1}}
 @media(min-width:1600px){main{columns:4}}
 @media(max-width:850px){main{columns:2}header{padding-top:25px}}
