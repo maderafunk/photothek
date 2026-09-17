@@ -90,6 +90,7 @@ class GalleryTests(unittest.TestCase):
             build.render({'sites': [site]}, {}, Path(tmp), updated_on='2026-09-17')
             html = (Path(tmp) / 'index.html').read_text()
         self.assertIn('<time datetime="2026-09-17">2026-09-17</time>', html)
+        self.assertIn('Photography Wall is updated every Friday - last update:', html)
         self.assertNotIn('2026-09-17T', html)
 
     def test_render_orders_newest_updated_tile_first(self):
