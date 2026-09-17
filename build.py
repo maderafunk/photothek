@@ -337,7 +337,9 @@ def config(path):
         s['images'] = 3
     return value
 
-def render(cfg, records, output):
+def render(cfg, records, output, updated_on=None):
+    updated_on = updated_on or datetime.now(timezone.utc).date().isoformat()
+    
     tiles = []
     for idx, site in enumerate(cfg['sites']):
         record = records.get(site['id'], {})
