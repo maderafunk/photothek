@@ -368,7 +368,7 @@ def render(cfg, records, output, updated_on=None):
 <body><a class="skip" href="#gallery">Skip to photographs</a>
 <header><h1>{title}</h1><p class="edition">{len(cfg['sites']):02d} publications</p></header>
 <main id="gallery" aria-label="Photography publications">{''.join(tiles)}</main>
-<footer><p>Photographs belong to their respective creators.</p><nav aria-label="Publications">{links}</nav></footer>
+<footer><p>Photographs belong to their respective creators.</p><nav aria-label="Publications">{links}</nav><p class="updated">Last updated: <time datetime="{updated_on}">{updated_on}</time></p></footer>
 </body></html>\n'''
     (output / 'index.html').write_text(content)
     css = ROOT / 'dist' / 'style.css'
