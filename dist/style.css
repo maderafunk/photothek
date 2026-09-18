@@ -13,13 +13,14 @@ h1{font-size:clamp(1.5rem,3vw,2.25rem);font-weight:500;letter-spacing:-.055em;li
 .theme-switch{display:block;cursor:pointer;color:var(--ink)}
 .theme-track{display:block;position:relative;width:38px;height:20px;border:1px solid currentColor;border-radius:0}
 .theme-knob{position:absolute;top:3px;left:3px;width:12px;height:12px;fill:currentColor;border-radius:0;shape-rendering:crispEdges;transition:transform .2s ease}
-.theme-toggle:checked+.theme-switch .theme-knob{transform:translateX(18px) scaleX(-1)}
+.theme-toggle:checked+.theme-switch .theme-knob{transform:translateX(18px)}
 .theme-toggle:focus-visible+.theme-switch{outline:2px solid #144dff;outline-offset:4px}
 .edition{font-size:.875rem;color:var(--muted);margin:0;white-space:nowrap}
 main{max-width:1800px;margin:22px auto 0;columns:3;column-gap:var(--gap);font-size:0}
 .tile{break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid;width:100%;margin:0 0 var(--gap);display:inline-block;vertical-align:top;position:relative;overflow:hidden;font-size:1rem}
 .magazine-group{display:contents}
 .detail-toggle,.close-toggle{position:absolute;width:1px;height:1px;margin:-1px;clip-path:inset(50%);overflow:hidden;white-space:nowrap}
+.close-toggle{position:fixed;top:0;left:0}
 .card{position:relative}
 .detail-toggle:focus-visible+.card{outline:3px solid #144dff;outline-offset:3px}
 .card-front,.card-back{display:block;overflow:hidden;transition:opacity .25s ease}
