@@ -100,10 +100,8 @@ class GalleryTests(unittest.TestCase):
             html = (Path(tmp) / 'index.html').read_text()
             for filename in ('favicon.svg', 'favicon.png', 'favicon.ico', 'apple-touch-icon.png'):
                 self.assertTrue((Path(tmp) / filename).exists())
-        self.assertIn('<link rel="icon" href="favicon.svg?v=6" type="image/svg+xml">', html)
-        self.assertIn('<link rel="icon" href="favicon.png?v=6" type="image/png" sizes="64x64">', html)
-        self.assertIn('<link rel="shortcut icon" href="favicon.ico?v=6">', html)
-        self.assertIn('<link rel="apple-touch-icon" href="apple-touch-icon.png?v=6">', html)
+        self.assertIn('<link rel="icon" href="favicon.ico" type="image/x-icon" sizes="any">', html)
+        self.assertIn('<link rel="apple-touch-icon" href="apple-touch-icon.png">', html)
         self.assertIn('<svg class="site-logo" aria-hidden="true"', html)
         self.assertIn('<input class="theme-toggle" type="checkbox" id="theme-toggle"', html)
         self.assertIn('<label class="theme-switch" for="theme-toggle"', html)
