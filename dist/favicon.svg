@@ -3,5 +3,5 @@
     path { fill: #3a3a3a; }
     @media (prefers-color-scheme: dark) { path { fill: #f2f2f2; } }
   </style>
-  <path fill-rule="evenodd" d="M0 0h64v64H0zM5 5v23h15V5zm0 28v26h15V33zM25 5v13h17V5zm0 18v22h17V23zm0 27v9h17V50zM47 5v32h12V5zm0 37v17h12V42z"/>
+  <path fill-rule="evenodd" d="M5 5h20v54H5zM10 10v44h10V10zM30 5h29v29H30zM35 10v19h19V10z"/>
 </svg>
