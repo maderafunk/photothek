@@ -18,17 +18,11 @@ sites:
   - name: LensCulture
     link: https://www.lensculture.com/
     
-  - name: Super Massive Black Hole
-    link: https://smbhmag.com/
-    
   - name: Burn Magazine
     link: https://www.burnmagazine.org/
     
   - name: Der Greif
     link: https://dergreif.org/
-    
-  - name: LENSCRATCH
-    link: https://lenscratch.com/
     
   - name: Urbanautica
     link: https://urbanautica.com/
@@ -56,5 +50,3 @@ sites:
 
   - name: PHASES
     link: https://phasesmag.com/
-
-    
