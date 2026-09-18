@@ -1,160 +1,549 @@
-import tempfile
+#!/usr/bin/env python3
+"""Build an HTML/CSS photography wall. Network access happens only at build time."""
+from __future__ import annotations
+import argparse
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
+from html import escape, unescape
+from html.parser import HTMLParser
+import json
 from pathlib import Path
-import unittest
-import build
+import re
+import shutil
+from urllib.error import HTTPError
+from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
+from urllib.request import Request, urlopen
+import xml.etree.ElementTree as ET
+import yaml
 
-class FakeClient:
-    def __init__(self, pages):
-        self.pages = pages
+ROOT = Path(__file__).resolve().parent
+VOID = set('area base br col embed hr img input link meta param source track wbr'.split())
+NOW = lambda: datetime.now(timezone.utc).isoformat(timespec='seconds')
+
+class Node:
+    def __init__(self, tag='', attrs=(), parent=None):
+        self.tag, self.attrs, self.parent = tag, dict(attrs), parent
+        self.children = []
+    def walk(self, tag=None):
+        for child in self.children:
+            if isinstance(child, Node):
+                if tag is None or child.tag == tag:
+                    yield child
+                yield from child.walk(tag)
+    def text(self):
+        return ' '.join(c.text() if isinstance(c, Node) else c for c in self.children).strip()
+
+class Document(HTMLParser):
+    def __init__(self, html):
+        super().__init__(convert_charrefs=True)
+        self.root = self.current = Node()
+        self.feed(html)
+    def handle_starttag(self, tag, attrs):
+        node = Node(tag, attrs, self.current)
+        self.current.children.append(node)
+        if tag not in VOID:
+            self.current = node
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
+        if tag not in VOID:
+            self.handle_endtag(tag)
+    def handle_endtag(self, tag):
+        node = self.current
+        while node.parent is not None:
+            if node.tag == tag:
+                self.current = node.parent
+                return
+            node = node.parent
+    def handle_data(self, data):
+        self.current.children.append(data)
+
+def url(value, base=''):
+    value = urljoin(base, unescape(str(value or '').strip()))
+    p = urlsplit(value)
+    if p.scheme not in ('https', 'http') or not p.hostname or p.username or p.password:
+        raise ValueError('Expected a public HTTP(S) URL')
+    if p.hostname in ('localhost', '127.0.0.1', '::1'):
+        raise ValueError('Local URLs are not supported')
+    return urlunsplit((p.scheme, p.netloc, quote(p.path, safe='/%:@!$&\'()*+,;=-._~'), p.query, ''))
+
+def write_json(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_suffix('.tmp')
+    temp.write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n')
+    temp.replace(path)
+
+def load_json(path, default):
+    try:
+        return json.loads(path.read_text())
+    except (FileNotFoundError, json.JSONDecodeError):
+        return default
+
+class Client:
+    """Conditional requests, timeouts and byte/request caps; one client per source."""
+    def __init__(self, site_id):
+        self.path = ROOT / '.cache' / (site_id + '.json')
+        self.cache = load_json(self.path, {})
+        self.used = {}
+        self.probed = 0
     def get(self, address):
-        return self.pages[address]
-
-class GalleryTests(unittest.TestCase):
-    def test_common_image_dimensions_are_read_from_headers(self):
-        png = b'\x89PNG\r\n\x1a\n' + b'\0' * 8 + (640).to_bytes(4, 'big') + (480).to_bytes(4, 'big')
-        gif = b'GIF89a' + (320).to_bytes(2, 'little') + (240).to_bytes(2, 'little')
-        self.assertEqual(build.image_dimensions(png), (640, 480))
-        self.assertEqual(build.image_dimensions(gif), (320, 240))
-
-    def test_minimal_config_generates_id_and_defaults(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / 'sites.yml'
-            path.write_text('sites:\n  - name: Example Magazine\n    link: https://example.com/\n')
-            site = build.config(path)['sites'][0]
-        self.assertEqual(site['id'], 'example-magazine')
-        self.assertEqual(site['url'], 'https://example.com/')
-        self.assertEqual(site['images'], 3)
-
-    def test_one_image_count_applies_to_every_site(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / 'sites.yml'
-            path.write_text('images_per_site: 5\nsites:\n  - name: One\n    link: https://one.example/\n  - name: Two\n    link: https://two.example/\n')
-            sites = build.config(path)['sites']
-        self.assertEqual([site['images'] for site in sites], [5, 5])
-
-    def test_legacy_site_fields_are_rejected(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / 'sites.yml'
-            path.write_text('sites:\n  - name: Example\n    url: https://example.com/\n    mode: feed\n')
-            with self.assertRaisesRegex(ValueError, 'use only name and link'):
-                build.config(path)
-
-    def test_auto_continues_after_broken_feed(self):
-        homepage = '''<link rel="alternate" type="application/rss+xml" href="/bad-feed">
-        <a href="/stories/one"><img data-src="/photo.jpg" alt="Story"></a>'''
-        site = {'url': 'https://example.com/', 'name': 'Example', 'images': 1}
-        photos = build.discover(FakeClient({
-            site['url']: homepage,
-            'https://example.com/bad-feed': '<not xml',
-            'https://example.com/feed': '<not xml',
-            'https://example.com/feed.xml': '<not xml',
-            'https://example.com/rss.xml': '<not xml',
-        }), site)
-        self.assertEqual(photos[0]['src'], 'https://example.com/photo.jpg')
-        self.assertEqual(photos[0]['article'], 'https://example.com/stories/one')
-
-    def test_feed_uses_publication_order_not_document_order(self):
-        feed = '''<rss><channel>
-          <item><title>Old</title><link>https://example.com/old</link><pubDate>Mon, 01 Jun 2026 10:00:00 GMT</pubDate><description>&lt;img src="/old.jpg"&gt;</description></item>
-          <item><title>New</title><link>https://example.com/new</link><pubDate>Tue, 01 Sep 2026 10:00:00 GMT</pubDate><description>&lt;img src="/new.jpg"&gt;</description></item>
-        </channel></rss>'''
-        site = {'url': 'https://example.com/', 'feed': 'https://example.com/feed', 'name': 'Example', 'images': 1}
-        photos = build.feed_images(FakeClient({site['feed']: feed}), site)
-        self.assertEqual(photos[0]['src'], 'https://example.com/new.jpg')
-
-    def test_cdn_srcset_commas_are_preserved(self):
-        node = build.Node('img', {'src': '/a.jpg', 'srcset': 'https://example.com/image/w_320,q_auto/a.jpg 320w, https://example.com/image/w_640,q_auto/a.jpg 640w, https://example.com/image/w_1200,q_auto/a.jpg 1200w'})
-        self.assertEqual(build.image(node, 'https://example.com')['src'], 'https://example.com/image/w_640,q_auto/a.jpg')
-
-    def test_header_images_and_resized_duplicates_are_excluded(self):
-        markup = '''<header><img src="/hero.jpg" width="1200" height="300"></header>
-        <main><img src="/work-400x300.jpg"><img src="/work-1200x900.jpg"></main>'''
-        doc = build.Document(markup).root
-        photos = build.unique((build.image(node, 'https://example.com/') for node in doc.walk('img')), 3)
-        self.assertEqual([photo['src'] for photo in photos], ['https://example.com/work-400x300.jpg'])
-
-    def test_source_text_cannot_inject_scripts(self):
-        site = {'id': 'example', 'url': 'https://example.com/', 'name': '<script>alert(1)</script>', 'images': 1}
-        records = {'example': {'images': [{'src': 'https://example.com/photo.jpg', 'alt': '\" onerror=\"alert(1)'}]}}
-        with tempfile.TemporaryDirectory() as tmp:
-            build.render({'sites': [site]}, records, Path(tmp))
-            doc = build.Document((Path(tmp) / 'index.html').read_text()).root
-            self.assertEqual(list(doc.walk('script')), [])
-            self.assertNotIn('onerror', next(doc.walk('img')).attrs)
-        with self.assertRaises(ValueError):
-            build.url('javascript:alert(1)')
-
-    def test_render_includes_date_without_time(self):
-        site = {'id': 'example', 'url': 'https://example.com/', 'name': 'Example', 'images': 3}
-        with tempfile.TemporaryDirectory() as tmp:
-            build.render({'sites': [site]}, {}, Path(tmp), updated_on='2026-09-17')
-            html = (Path(tmp) / 'index.html').read_text()
-        self.assertIn('<time datetime="2026-09-17">2026-09-17</time>', html)
-        self.assertIn('Photography Wall is updated every Friday. Last update:', html)
-        self.assertNotIn('2026-09-17T', html)
-
-    def test_render_includes_favicon(self):
-        site = {'id': 'example', 'url': 'https://example.com/', 'name': 'Example', 'images': 3}
-        with tempfile.TemporaryDirectory() as tmp:
-            build.render({'sites': [site]}, {}, Path(tmp), updated_on='2026-09-17')
-            html = (Path(tmp) / 'index.html').read_text()
-            for filename in ('favicon.svg', 'favicon.png', 'favicon.ico', 'apple-touch-icon.png'):
-                self.assertTrue((Path(tmp) / filename).exists())
-        self.assertIn('<link rel="icon" href="favicon.ico" type="image/x-icon" sizes="any">', html)
-        self.assertIn('<link rel="apple-touch-icon" href="apple-touch-icon.png">', html)
-        self.assertIn('<svg class="site-wordmark" aria-hidden="true"', html)
-        self.assertIn('<input class="theme-toggle" type="checkbox" id="theme-toggle"', html)
-        self.assertIn('<label class="theme-switch" for="theme-toggle"', html)
-
-    def test_render_orders_newest_updated_tile_first(self):
-        older = {'id': 'older', 'url': 'https://older.example/', 'name': 'Older', 'images': 3}
-        newer = {'id': 'newer', 'url': 'https://newer.example/', 'name': 'Newer', 'images': 3}
-        records = {
-            'older': {'updated_at': '2026-09-01T12:00:00+00:00', 'images': [{'src': 'https://older.example/photo.jpg'}]},
-            'newer': {'updated_at': '2026-09-17T12:00:00+00:00', 'images': [{'src': 'https://newer.example/photo.jpg'}]},
+        address = url(address)
+        if address in self.used:
+            return self.used[address]
+        if len(self.used) >= 8:
+            raise ValueError('Per-source request limit reached')
+        old = self.cache.get(address, {})
+        headers = {'User-Agent': 'PhotographyWall/1.0 (static photography link gallery)', 'Accept': 'text/html,application/rss+xml,application/atom+xml,application/xml;q=0.9'}
+        if old.get('etag'):
+            headers['If-None-Match'] = old['etag']
+        if old.get('modified'):
+            headers['If-Modified-Since'] = old['modified']
+        try:
+            with urlopen(Request(address, headers=headers), timeout=25) as response:
+                raw = response.read(3_000_001)
+                if len(raw) > 3_000_000:
+                    raise ValueError('Source exceeds 3 MB limit')
+                body = raw.decode(response.headers.get_content_charset() or 'utf-8', errors='replace')
+                self.cache[address] = {'body': body, 'etag': response.headers.get('ETag'), 'modified': response.headers.get('Last-Modified')}
+        except HTTPError as exc:
+            if exc.code != 304 or 'body' not in old:
+                raise
+            body = old['body']
+        self.used[address] = body
+        return body
+    def dimensions(self, address):
+        """Read just enough image bytes to determine its intrinsic size."""
+        if self.probed >= 6:
+            return None
+        self.probed += 1
+        address = url(address)
+        headers = {
+            'User-Agent': 'PhotographyWall/1.0 (static photography link gallery)',
+            'Accept': 'image/avif,image/webp,image/png,image/jpeg,image/gif,*/*;q=0.1',
+            'Range': 'bytes=0-262143',
         }
-        with tempfile.TemporaryDirectory() as tmp:
-            build.render({'sites': [older, newer]}, records, Path(tmp), updated_on='2026-09-17')
-            doc = build.Document((Path(tmp) / 'index.html').read_text()).root
-        toggles = [node for node in doc.walk('input') if node.attrs.get('class') == 'detail-toggle']
-        self.assertEqual([node.attrs['id'] for node in toggles], ['tile-newer-1', 'tile-older-1'])
+        with urlopen(Request(address, headers=headers), timeout=20) as response:
+            raw = response.read(262_145)
+        return image_dimensions(raw)
+    def save(self):
+        # Bound cache size to URLs used in this build; article bodies contain no image bytes.
+        write_json(self.path, {k: self.cache[k] for k in self.used if k in self.cache})
 
-    def test_render_orders_footer_links_alphabetically(self):
-        zulu = {'id': 'zulu', 'url': 'https://zulu.example/', 'name': 'Zulu', 'images': 3}
-        alpha = {'id': 'alpha', 'url': 'https://alpha.example/', 'name': 'alpha', 'images': 3}
-        with tempfile.TemporaryDirectory() as tmp:
-            build.render({'sites': [zulu, alpha]}, {}, Path(tmp), updated_on='2026-09-17')
-            doc = build.Document((Path(tmp) / 'index.html').read_text()).root
-        nav = next(doc.walk('nav'))
-        self.assertEqual([node.text() for node in nav.walk('a')], ['alpha', 'Zulu'])
+def image_dimensions(raw):
+    """Return (width, height) for common web image headers."""
+    if raw.startswith(b'\x89PNG\r\n\x1a\n') and len(raw) >= 24:
+        return int.from_bytes(raw[16:20], 'big'), int.from_bytes(raw[20:24], 'big')
+    if raw[:3] in (b'GIF',) and len(raw) >= 10:
+        return int.from_bytes(raw[6:8], 'little'), int.from_bytes(raw[8:10], 'little')
+    if raw.startswith(b'\xff\xd8'):
+        position = 2
+        sof = {0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf}
+        while position + 9 <= len(raw):
+            if raw[position] != 0xff:
+                position += 1
+                continue
+            while position < len(raw) and raw[position] == 0xff:
+                position += 1
+            if position >= len(raw):
+                break
+            marker = raw[position]
+            position += 1
+            if marker in sof and position + 7 <= len(raw):
+                return int.from_bytes(raw[position + 5:position + 7], 'big'), int.from_bytes(raw[position + 3:position + 5], 'big')
+            if marker in (0x01, 0xd8, 0xd9) or 0xd0 <= marker <= 0xd7:
+                continue
+            if position + 2 > len(raw):
+                break
+            length = int.from_bytes(raw[position:position + 2], 'big')
+            if length < 2:
+                break
+            position += length
+    if raw.startswith(b'RIFF') and raw[8:12] == b'WEBP' and len(raw) >= 30:
+        kind = raw[12:16]
+        if kind == b'VP8X':
+            return 1 + int.from_bytes(raw[24:27], 'little'), 1 + int.from_bytes(raw[27:30], 'little')
+        if kind == b'VP8 ' and raw[23:26] == b'\x9d\x01\x2a':
+            return int.from_bytes(raw[26:28], 'little') & 0x3fff, int.from_bytes(raw[28:30], 'little') & 0x3fff
+        if kind == b'VP8L' and raw[20] == 0x2f:
+            bits = int.from_bytes(raw[21:25], 'little')
+            return (bits & 0x3fff) + 1, ((bits >> 14) & 0x3fff) + 1
+    # AVIF stores display dimensions in an Image Spatial Extents property.
+    position = raw.find(b'ispe')
+    if position >= 4 and position + 16 <= len(raw):
+        width = int.from_bytes(raw[position + 8:position + 12], 'big')
+        height = int.from_bytes(raw[position + 12:position + 16], 'big')
+        if width and height:
+            return width, height
+    return None
 
-    def test_image_tiles_share_magazine_selection(self):
-        site = {'id': 'example', 'url': 'https://example.com/', 'name': 'Example', 'images': 3}
-        records = {'example': {'images': [
-            {'src': 'https://example.com/one.jpg'},
-            {'src': 'https://example.com/two.jpg'},
-        ]}}
-        with tempfile.TemporaryDirectory() as tmp:
-            build.render({'sites': [site]}, records, Path(tmp), updated_on='2026-09-17')
-            html = (Path(tmp) / 'index.html').read_text()
-            doc = build.Document(html).root
-        toggles = [node for node in doc.walk('input') if node.attrs.get('class') == 'detail-toggle']
-        self.assertEqual(len(toggles), 2)
-        self.assertEqual([node.attrs['type'] for node in toggles], ['radio', 'radio'])
-        self.assertEqual([node.attrs['id'] for node in toggles], ['tile-example-1', 'tile-example-2'])
-        self.assertTrue(all(node.attrs['name'] == 'selected-card' for node in toggles))
-        self.assertEqual(len(list(doc.walk('article'))), 2)
-        close_labels = [node for node in doc.walk('label') if node.attrs.get('class') == 'card-close']
-        self.assertTrue(all(node.attrs['for'] == 'cards-closed' for node in close_labels))
-        link = next(node for node in doc.walk('a') if node.attrs.get('href') == 'https://example.com/')
-        self.assertEqual(link.attrs['target'], '_blank')
-        self.assertEqual(link.attrs['rel'], 'noopener noreferrer')
-        arrow = next(node for node in doc.walk('svg') if node.attrs.get('class') == 'external-arrow')
-        self.assertEqual(arrow.attrs['class'], 'external-arrow')
-        backs = [node for node in doc.walk() if 'back-picture' in node.attrs.get('class', '').split()]
-        self.assertEqual(len(backs), 2)
-        self.assertTrue(all(len(list(node.walk('img'))) == 1 for node in backs))
-        self.assertNotIn('↗', html)
+def decorative_context(node):
+    """Identify images placed in site chrome rather than editorial content."""
+    chrome = re.compile(r'(^|[-_\s])(header|masthead|branding|brand|logo|site-title|navbar|navigation)([-_\s]|$)', re.I)
+    current = node
+    while current:
+        if current.tag in ('header', 'nav') or current.attrs.get('role', '').lower() in ('banner', 'navigation'):
+            return True
+        markers = ' '.join(str(current.attrs.get(k, '')) for k in ('id', 'class'))
+        if chrome.search(markers):
+            return True
+        current = current.parent
+    return False
+
+def image_url(address):
+    return bool(re.search(r'\.(?:avif|gif|jpe?g|png|webp)(?:$|[?#])', address, re.I))
+
+def homepage_alias(address):
+    path = urlsplit(address).path.rstrip('/').lower()
+    return path.rsplit('/', 1)[-1] in ('home', 'home.html', 'home.htm', 'index.html', 'index.htm')
+
+def image(node, base, title='', article=''):
+    attrs = node.attrs
+    if decorative_context(node):
+        return None
+    source = attrs.get('data-src') or attrs.get('data-original') or attrs.get('src')
+    candidates = []
+    # Split at descriptor separators, not commas embedded in CDN image URLs.
+    for match in re.finditer(r'(\S+)\s+(\d+(?:\.\d+)?)(w|x)(?:\s*,\s*|$)', attrs.get('data-srcset') or attrs.get('srcset') or ''):
+        candidate, size, unit = match.groups()
+        candidates.append((float(size) * (370 if unit == 'x' else 1), candidate))
+    if candidates:
+        candidates.sort()
+        source = next((v for w, v in candidates if w >= 600), candidates[-1][1])
+    try:
+        source = url(source, base) if source else ''
+    except ValueError:
+        return None
+    markers = ' '.join(str(attrs.get(k, '')) for k in ('alt', 'class', 'id'))
+    if not source or re.search(r'(logo|avatar|tracking|pixel|icon|badge|button|masthead|site[-_]?header|branding)', source + ' ' + markers, re.I):
+        return None
+    if urlsplit(source).path.lower().endswith('.svg'):
+        return None
+    for key in ('width', 'height'):
+        if str(attrs.get(key, '')).isdigit() and int(attrs[key]) < 100:
+            return None
+    if all(str(attrs.get(k, '')).isdigit() and int(attrs[k]) > 0 for k in ('width', 'height')):
+        width, height = int(attrs['width']), int(attrs['height'])
+        if width / height > 4.5:
+            return None
+    out = {'src': source, 'alt': attrs.get('alt') or title or 'Photograph', 'article': article or base, 'title': title}
+    if all(str(attrs.get(k, '')).isdigit() and int(attrs[k]) > 0 for k in ('width', 'height')):
+        out.update(width=int(attrs['width']), height=int(attrs['height']))
+    return out
+
+def image_identity(address):
+    """Collapse common CDN and CMS resized variants of the same asset."""
+    parsed = urlsplit(address)
+    path = unquote(parsed.path).lower()
+    path = re.sub(r'[-_]\d{2,5}x\d{2,5}(?=\.[a-z0-9]+$)', '', path)
+    path = re.sub(r'@(?:2|3)x(?=\.[a-z0-9]+$)', '', path)
+    path = re.sub(r'/(?:w|h)_\d+(?:,[^/]+)*/', '/', path)
+    return ((parsed.hostname or '').lower().removeprefix('www.'), path)
+
+def saved_image_allowed(item):
+    """Apply filters that remain available when rendering cached selections."""
+    markers = ' '.join(str(item.get(k, '')) for k in ('src', 'alt', 'title'))
+    if re.search(r'(logo|avatar|tracking|pixel|icon|badge|button|masthead|site[-_]?header|branding)', markers, re.I):
+        return False
+    if item.get('width') and item.get('height') and item['width'] / item['height'] > 4.5:
+        return False
+    return True
+
+def unique(images, count):
+    seen, result = set(), []
+    for item in images:
+        identity = image_identity(item['src']) if item else None
+        if item and identity not in seen:
+            seen.add(identity); result.append(item)
+            if len(result) == count:
+                break
+    return result
+
+def article_image(client, address, title):
+    doc = Document(client.get(address)).root
+    articles = list(doc.walk('article'))
+    container = articles[0] if articles else doc
+    # Prefer actual article photographs over mastheads and site social cards.
+    found = unique((image(n, address, title, address) for n in container.walk('img')), 1)
+    if found:
+        return found[0]
+    for n in doc.walk('meta'):
+        if n.attrs.get('property') == 'og:image':
+            return image(Node('img', {'src': n.attrs.get('content')}), address, title, address)
+
+def same_site(address, homepage):
+    """Treat www.example.com and example.com as the same publication."""
+    def host(value):
+        return (urlsplit(value).hostname or '').lower().removeprefix('www.')
+    return host(address) == host(homepage)
+
+def linked_images(doc, site):
+    """Images that link to an article are usually homepage editorial cards."""
+    result = []
+    for n in doc.walk('img'):
+        parent = n.parent
+        while parent and parent.tag != 'a':
+            parent = parent.parent
+        if not parent or not parent.attrs.get('href'):
+            continue
+        try:
+            article = url(parent.attrs['href'], site['url'])
+        except ValueError:
+            continue
+        if not same_site(article, site['url']) or article == site['url'] or homepage_alias(article) or image_url(article):
+            continue
+        title = n.attrs.get('alt') or parent.attrs.get('title') or site['name']
+        result.append(image(n, site['url'], title, article))
+    return unique(result, site['images'])
+
+def metadata_images(doc, site):
+    """Use standard publisher metadata before falling back to unscoped images."""
+    result = []
+    for n in doc.walk('meta'):
+        key = (n.attrs.get('property') or n.attrs.get('name') or '').lower()
+        if key in ('og:image', 'og:image:url', 'twitter:image', 'twitter:image:src'):
+            result.append(image(Node('img', {'src': n.attrs.get('content')}),
+                                site['url'], site['name'], site['url']))
+    return unique(result, site['images'])
+
+def article_links(doc, site):
+    """Rank plausible article links for sites whose cards use CSS backgrounds."""
+    ranked, seen = [], set()
+    reject = re.compile(r'/(?:about|contact|privacy|login|account|shop|category|tag|author)(?:/|$)', re.I)
+    for n in doc.walk('a'):
+        try:
+            address = url(n.attrs.get('href'), site['url'])
+        except ValueError:
+            continue
+        path = urlsplit(address).path
+        if address in seen or not same_site(address, site['url']) or address == site['url'] or homepage_alias(address) or image_url(address) or reject.search(path):
+            continue
+        seen.add(address)
+        # Dated and deeper URLs are more likely to be editorial pages.
+        score = (3 if re.search(r'/20\d\d/', path) else 0) + path.strip('/').count('/') + (1 if n.text() else 0)
+        ranked.append((score, address, n.text() or site['name']))
+    ranked.sort(key=lambda item: item[0], reverse=True)
+    return ranked
+
+def feed_images(client, site):
+    body = client.get(site['feed'])
+    if '<!DOCTYPE' in body.upper():
+        raise ValueError('Feed with a document type is unsupported')
+    root = ET.fromstring(body)
+    entries = root.findall('.//item') or root.findall('{http://www.w3.org/2005/Atom}entry')
+    if not entries:
+        raise ValueError('No feed entries found')
+    def fields(entry):
+        return {n.tag.rsplit('}', 1)[-1]: n for n in entry}
+    def dated(entry):
+        f = fields(entry)
+        for k in ('pubDate', 'published', 'updated'):
+            if k in f:
+                raw = f[k].text or ''
+                try:
+                    d = parsedate_to_datetime(raw) if k == 'pubDate' else datetime.fromisoformat(raw.replace('Z', '+00:00'))
+                    return d.replace(tzinfo=d.tzinfo or timezone.utc).timestamp()
+                except (ValueError, TypeError):
+                    pass
+        return 0
+    entries.sort(key=dated, reverse=True)
+    result = []
+    for entry in entries[:site['images'] + 2]:
+        f = fields(entry)
+        title = f['title'].text or '' if 'title' in f else site['name']
+        link = f.get('link')
+        if link is None:
+            continue
+        address = url(link.get('href') or link.text, site['url'])
+        if urlsplit(address).hostname != urlsplit(site['url']).hostname:
+            continue
+        selected = None
+        for key in ('encoded', 'content', 'description', 'summary'):
+            if key in f:
+                html = f[key].text or ''
+                if list(f[key]):
+                    html += ''.join(ET.tostring(c, encoding='unicode') for c in f[key])
+                photos = unique((image(n, address, title, address) for n in Document(html).root.walk('img')), 1)
+                if photos:
+                    selected = photos[0]; break
+        if not selected and 'enclosure' in f and f['enclosure'].get('type', '').startswith('image/'):
+            selected = image(Node('img', {'src': f['enclosure'].get('url')}), address, title, address)
+        if not selected:
+            selected = article_image(client, address, title)
+        if selected:
+            selected['published'] = next((f[k].text for k in ('pubDate', 'published', 'updated') if k in f), None)
+            result.append(selected)
+        if len(unique(result, site['images'])) == site['images']:
+            break
+    return unique(result, site['images'])
+
+def discover(client, site):
+    doc = Document(client.get(site['url'])).root
+    # Each strategy is independent: a broken or blocked feed must not prevent
+    # the HTML strategies from running.
+    feeds = []
+    for n in doc.walk('link'):
+        if n.attrs.get('type', '').split(';')[0].strip() in ('application/rss+xml', 'application/atom+xml'):
+            try:
+                feeds.append(url(n.attrs.get('href'), site['url']))
+            except ValueError:
+                pass
+    base = urljoin(site['url'], '/')
+    feeds.extend(urljoin(base, path) for path in ('feed', 'feed.xml', 'rss.xml'))
+    photos = []
+    for feed in dict.fromkeys(feeds):
+        try:
+            photos = unique(photos + feed_images(client, {**site, 'feed': feed}), site['images'])
+            if len(photos) == site['images']:
+                return photos
+        except Exception:
+            continue
+
+    photos = unique(photos + linked_images(doc, site), site['images'])
+    if len(photos) == site['images']:
+        return photos
+    photos = unique(photos + metadata_images(doc, site), site['images'])
+    if len(photos) == site['images']:
+        return photos
+
+    # Some modern sites render thumbnails as CSS backgrounds. Probe their
+    # most article-like links and extract the first photograph on each page.
+    for _, address, title in article_links(doc, site):
+        if len(client.used) >= 8:
+            break
+        try:
+            photos.append(article_image(client, address, title))
+        except Exception:
+            continue
+        photos = unique(photos, site['images'])
+        if len(photos) == site['images']:
+            return photos
+
+    # Last resort for simple portfolio pages with unlinked photographs.
+    photos.extend(image(n, site['url'], n.attrs.get('alt') or site['name'], site['url'])
+                  for n in doc.walk('img'))
+    return unique(photos, site['images'])
+
+def config(path):
+    value = yaml.safe_load(path.read_text())
+    if not isinstance(value, dict) or not isinstance(value.get('sites'), list) or not value['sites']:
+        raise ValueError('sites.yml must contain a nonempty sites list')
+    images_per_site = value.setdefault('images_per_site', 3)
+    if type(images_per_site) is not int or not 1 <= images_per_site <= 6:
+        raise ValueError('images_per_site must be an integer from 1 to 6')
+    ids = set()
+    for s in value['sites']:
+        if not isinstance(s, dict):
+            raise ValueError('Each site must be a mapping with name and link')
+        extra = set(s) - {'name', 'link'}
+        if extra:
+            raise ValueError('Unknown site fields: ' + ', '.join(sorted(extra)) + '; use only name and link')
+        if not isinstance(s.get('name'), str) or not s['name'].strip():
+            raise ValueError('Each site needs a name')
+        s['id'] = re.sub(r'[^a-z0-9]+', '-', s['name'].lower()).strip('-')
+        if not re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*', str(s.get('id', ''))):
+            raise ValueError('Site names must contain letters or numbers')
+        if s['id'] in ids:
+            raise ValueError('Duplicate site id: ' + s['id'])
+        ids.add(s['id'])
+        s['url'] = url(s.get('link'))
+        s['images'] = images_per_site
+    return value
+
+def render(cfg, records, output, updated_on=None):
+    updated_on = updated_on or datetime.now(timezone.utc).date().isoformat()
+    groups = []
+    image_index = 0
+    sites = sorted(cfg['sites'], key=lambda site: records.get(site['id'], {}).get('updated_at') or '', reverse=True)
+    for site in sites:
+        record = records.get(site['id'], {})
+        photos = unique((photo for photo in record.get('images', []) if saved_image_allowed(photo)), site['images'])
+        name, href = escape(site['name']), escape(url(site['url']), quote=True)
+        if not photos:
+            continue
+        tiles = []
+        for j, photo in enumerate(photos):
+            dims = ''
+            if photo.get('width') and photo.get('height'):
+                dims = f' width="{int(photo["width"])}" height="{int(photo["height"])}"'
+            loading = 'eager' if image_index < 3 else 'lazy'
+            image_index += 1
+            img = f'<img src="{escape(url(photo["src"]), quote=True)}" alt="{escape(photo.get("alt") or site["name"], quote=True)}" loading="{loading}" decoding="async"{dims}>'
+            control = f'tile-{site["id"]}-{j + 1}'
+            tiles.append(f'''<article class="tile">
+<input class="detail-toggle" type="radio" name="selected-card" id="{control}" aria-label="Show details for {name}">
+<div class="card">
+<label class="card-front" for="{control}">{img}</label>
+<div class="card-back"><span class="back-picture" aria-hidden="true">{img}</span><label class="card-close" for="cards-closed" aria-label="Return to photographs"></label><a href="{href}" target="_blank" rel="noopener noreferrer">{name}<svg class="external-arrow" aria-hidden="true" viewBox="0 0 16 16"><path d="M3 13 13 3M6 3h7v7"/></svg></a></div>
+</div></article>''')
+        groups.append(f'<section class="magazine-group" aria-label="{name}">{"".join(tiles)}</section>')
+    footer_sites = sorted(cfg['sites'], key=lambda site: site['name'].casefold())
+    links = ' '.join(f'<a href="{escape(s["url"], quote=True)}" target="_blank" rel="noopener noreferrer">{escape(s["name"])}</a>' for s in footer_sites)
+    title_text = str(cfg.get('title', 'Photography Wall'))
+    title = escape(title_text)
+    title_tail = escape(title_text[1:] if title_text[:1].casefold() == 'p' else title_text)
+    output.mkdir(parents=True, exist_ok=True)
+    content = f'''<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' https: http:; style-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="description" content="A photographic wall linking to independent photography publications and their recent work.">
+<title>{title}</title><link rel="icon" href="favicon.ico" type="image/x-icon" sizes="any"><link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="stylesheet" href="style.css?v=theme-8"></head>
+<body><a class="skip" href="#gallery">Skip to photographs</a>
+<header><h1 aria-label="{title}"><svg class="site-wordmark" aria-hidden="true" viewBox="0 0 300 64"><path fill-rule="evenodd" shape-rendering="crispEdges" d="M5 5h20v54H5zM10 10v44h10V10zM30 5h29v29H30zM35 10v19h19V10z"/><text x="64" y="52" font-family="Arial,Helvetica,sans-serif" font-size="64" font-weight="500" letter-spacing="-3.5">{title_tail}</text></svg></h1><div class="header-meta"><input class="theme-toggle" type="checkbox" id="theme-toggle" aria-label="Switch color theme"><label class="theme-switch" for="theme-toggle" title="Switch color theme"><span class="theme-track"><svg class="theme-knob" aria-hidden="true" viewBox="0 0 64 64" shape-rendering="crispEdges"><path fill-rule="evenodd" d="M5 5h20v54H5zM10 10v44h10V10zM30 5h29v29H30zM35 10v19h19V10z"/></svg></span></label><p class="edition">{len(cfg['sites']):02d} publications</p></div></header>
+<main id="gallery" aria-label="Photography publications"><input class="close-toggle" type="radio" name="selected-card" id="cards-closed" checked>{''.join(groups)}</main>
+<footer><p>Photographs belong to their respective creators.</p><nav aria-label="Publications">{links}</nav><p class="updated">{title} is updated every Friday. Last update: <time datetime="{updated_on}">{updated_on}</time></p></footer>
+</body></html>\n'''
+    (output / 'index.html').write_text(content)
+    assets = ROOT / 'dist'
+    if output.resolve() != assets.resolve():
+        for filename in ('style.css', 'favicon.svg', 'favicon.png', 'favicon.ico', 'apple-touch-icon.png'):
+            shutil.copyfile(assets / filename, output / filename)
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--offline', action='store_true', help='Render the saved image selection without network requests')
+    args = parser.parse_args()
+    cfg = config(ROOT / 'sites.yml')
+    path = ROOT / 'data' / 'gallery.json'
+    old = load_json(path, {'sites': {}})['sites']
+    def update(site):
+        previous = old.get(site['id'], {})
+        if previous.get('url') != site['url']:
+            previous = {}
+        if args.offline:
+            return site['id'], previous
+        client = Client(site['id'])
+        try:
+            photos = discover(client, site)
+            if not photos:
+                raise ValueError('No suitable images discovered')
+            for photo in photos:
+                if not photo.get('width') or not photo.get('height'):
+                    try:
+                        dimensions = client.dimensions(photo['src'])
+                        if dimensions and all(0 < value <= 100_000 for value in dimensions):
+                            photo['width'], photo['height'] = dimensions
+                    except Exception:
+                        # Dimensions improve layout but are not required to keep
+                        # an otherwise valid photograph.
+                        pass
+            record = {'url': site['url'], 'checked_at': NOW(), 'updated_at': NOW(), 'images': photos, 'error': None}
+            if photos == previous.get('images'):
+                record['updated_at'] = previous.get('updated_at', record['updated_at'])
+            print(f'{site["name"]}: {len(photos)} photographs', flush=True)
+        except Exception as exc:
+            record = {**previous, 'url': site['url'], 'checked_at': NOW(), 'error': str(exc)[:300]}
+            print(f'WARNING {site["name"]}: {exc}; retaining {len(previous.get("images", []))} previous photographs', flush=True)
+        finally:
+            client.save()
+        return site['id'], record
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        records = dict(pool.map(update, cfg['sites']))
+    if not args.offline:
+        write_json(path, {'sites': records})
+    render(cfg, records, ROOT / 'dist')
+    if not any(r.get('images') for r in records.values()):
+        raise SystemExit('No current or saved images available; refusing an empty deployment.')
+    print('Built dist/index.html — no browser JavaScript.')
 
 if __name__ == '__main__':
-    unittest.main()
+    main()
