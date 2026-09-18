@@ -102,7 +102,7 @@ class GalleryTests(unittest.TestCase):
                 self.assertTrue((Path(tmp) / filename).exists())
         self.assertIn('<link rel="icon" href="favicon.ico" type="image/x-icon" sizes="any">', html)
         self.assertIn('<link rel="apple-touch-icon" href="apple-touch-icon.png">', html)
-        self.assertIn('<svg class="site-logo" aria-hidden="true"', html)
+        self.assertIn('<svg class="site-wordmark" aria-hidden="true"', html)
         self.assertIn('<input class="theme-toggle" type="checkbox" id="theme-toggle"', html)
         self.assertIn('<label class="theme-switch" for="theme-toggle"', html)
 
