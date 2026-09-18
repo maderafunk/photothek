@@ -6,8 +6,8 @@ a{color:inherit;text-underline-offset:4px}
 .skip{position:absolute;top:-80px;left:20px;background:var(--paper);padding:12px;z-index:10}
 .skip:focus{top:10px}
 header{max-width:1800px;margin:auto;padding:32px 0 25px;display:flex;justify-content:space-between;gap:16px;align-items:flex-end;border-bottom:1px solid var(--line)}
-h1{font-size:clamp(1.5rem,3vw,2.25rem);font-weight:500;letter-spacing:-.055em;line-height:1.1;margin:0;display:flex;align-items:center;gap:0}
-.site-logo{width:1em;height:1em;margin-right:-.08em;flex:none;fill:currentColor;border-radius:0;shape-rendering:crispEdges}
+h1{font-size:clamp(1.5rem,3vw,2.25rem);font-weight:500;line-height:1.1;margin:0}
+.site-wordmark{display:block;width:4.6875em;height:1em;fill:currentColor;overflow:visible}
 .header-meta{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
 .theme-toggle{position:absolute;width:1px;height:1px;margin:-1px;clip-path:inset(50%);overflow:hidden;white-space:nowrap}
 .theme-switch{display:block;cursor:pointer;color:var(--ink)}
