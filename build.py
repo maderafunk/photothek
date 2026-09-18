@@ -478,7 +478,9 @@ def render(cfg, records, output, updated_on=None):
         groups.append(f'<section class="magazine-group" aria-label="{name}">{"".join(tiles)}</section>')
     footer_sites = sorted(cfg['sites'], key=lambda site: site['name'].casefold())
     links = ' '.join(f'<a href="{escape(s["url"], quote=True)}" target="_blank" rel="noopener noreferrer">{escape(s["name"])}</a>' for s in footer_sites)
-    title = escape(str(cfg.get('title', 'Photography Wall')))
+    title_text = str(cfg.get('title', 'Photography Wall'))
+    title = escape(title_text)
+    title_tail = escape(title_text[1:] if title_text[:1].casefold() == 'p' else title_text)
     output.mkdir(parents=True, exist_ok=True)
     content = f'''<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -486,7 +488,7 @@ def render(cfg, records, output, updated_on=None):
 <meta name="description" content="A photographic wall linking to independent photography publications and their recent work.">
 <title>{title}</title><link rel="icon" href="favicon.ico" type="image/x-icon" sizes="any"><link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="stylesheet" href="style.css?v=theme-4"></head>
 <body><a class="skip" href="#gallery">Skip to photographs</a>
-<header><h1><svg class="site-logo" aria-hidden="true" viewBox="0 0 64 64" shape-rendering="crispEdges"><path fill-rule="evenodd" d="M5 5h20v54H5zM10 10v44h10V10zM30 5h29v29H30zM35 10v19h19V10z"/></svg><span>{title}</span></h1><div class="header-meta"><input class="theme-toggle" type="checkbox" id="theme-toggle" aria-label="Switch color theme"><label class="theme-switch" for="theme-toggle" title="Switch color theme"><span class="theme-track"><svg class="theme-knob" aria-hidden="true" viewBox="0 0 64 64" shape-rendering="crispEdges"><path fill-rule="evenodd" d="M5 5h20v54H5zM10 10v44h10V10zM30 5h29v29H30zM35 10v19h19V10z"/></svg></span></label><p class="edition">{len(cfg['sites']):02d} publications</p></div></header>
+<header><h1 aria-label="{title}"><svg class="site-logo" aria-hidden="true" viewBox="0 0 64 64" shape-rendering="crispEdges"><path fill-rule="evenodd" d="M5 5h20v54H5zM10 10v44h10V10zM30 5h29v29H30zM35 10v19h19V10z"/></svg><span aria-hidden="true">{title_tail}</span></h1><div class="header-meta"><input class="theme-toggle" type="checkbox" id="theme-toggle" aria-label="Switch color theme"><label class="theme-switch" for="theme-toggle" title="Switch color theme"><span class="theme-track"><svg class="theme-knob" aria-hidden="true" viewBox="0 0 64 64" shape-rendering="crispEdges"><path fill-rule="evenodd" d="M5 5h20v54H5zM10 10v44h10V10zM30 5h29v29H30zM35 10v19h19V10z"/></svg></span></label><p class="edition">{len(cfg['sites']):02d} publications</p></div></header>
 <main id="gallery" aria-label="Photography publications"><input class="close-toggle" type="radio" name="selected-card" id="cards-closed" checked>{''.join(groups)}</main>
 <footer><p>Photographs belong to their respective creators.</p><nav aria-label="Publications">{links}</nav><p class="updated">{title} is updated every Friday. Last update: <time datetime="{updated_on}">{updated_on}</time></p></footer>
 </body></html>\n'''
